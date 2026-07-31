@@ -1,0 +1,1 @@
+Das Siemens-Testfoto liegt unter fixtures/siemens-label.jpg. Erwartete Kerndaten: Hersteller Siemens, Produktfamilie SIMATIC S7-300, Bestellnummer 6ES7 318-3FL01-0AB0. Die automatischen Unit-Tests prüfen Provider-Normalisierung ohne API-Kosten. Ein manueller End-to-End-Test erfolgt nach Deployment über die getrennten Endpunkte.

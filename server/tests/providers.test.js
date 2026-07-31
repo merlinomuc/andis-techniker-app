@@ -1,0 +1,3 @@
+import test from 'node:test'; import assert from 'node:assert/strict'; import {normalizeIdentifiers} from '../providers/index.js';
+test('normalisiert Siemens MLFB aus bekanntem Etikett',()=>{const out=normalizeIdentifiers({manufacturer:'SIEMENS',partNumber:'6ES7 318-3FL01-0AB0',rawText:'SIEMENS\nSIMATIC S7-300\n6ES7 318-3FL01-0AB0'}); assert.equal(out.provider,'siemens'); assert.equal(out.data.manufacturer,'SIEMENS'); assert.equal(out.data.partNumber,'6ES7 318-3FL01-0AB0');});
+test('erkennt Shimano Modellcode',()=>{const out=normalizeIdentifiers({manufacturer:'Shimano',partNumber:'',rawText:'SHIMANO DEORE LX RD-M581'}); assert.equal(out.provider,'shimano'); assert.equal(out.data.partNumber,'RD-M581');});

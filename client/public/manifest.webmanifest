@@ -1,10 +1,1 @@
-{
-  "name": "Andis Techniker-App",
-  "short_name": "Techniker-App",
-  "start_url": "/",
-  "display": "standalone",
-  "background_color": "#f4f7fa",
-  "theme_color": "#102a43",
-  "description": "Technische Bauteile erkennen und Informationen finden.",
-  "icons": [{ "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }]
-}
+{"name":"Andis Techniker-App","short_name":"Andis Technik","start_url":"/","display":"standalone","background_color":"#06131c","theme_color":"#06131c","icons":[{"src":"/icon.svg","sizes":"any","type":"image/svg+xml"}]}
