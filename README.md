@@ -1,8 +1,8 @@
-# Andis Techniker-App – Version 1.4
+# Andis Techniker-App – Version 1.5
 
 Mobile-first PWA zur Identifikation technischer Geräte, Bauteile, Typenschilder, Verpackungsetiketten, Displays sowie QR- und Barcodes.
 
-## Neu in Version 1.4
+## Neu in Version 1.5
 
 - eigener Bildfokus: **Automatisch**, **Gerät**, **Etikett / Typenschild** oder **Display / Fehlercode**
 - Verpackungskartons und Produktetiketten gelten ausdrücklich als Identifikationsziel
@@ -66,3 +66,13 @@ Für kleine Typenschilder oder Verpackungslabels den Modus **Etikett / Typenschi
 ## Sicherheit
 
 Der OpenAI-API-Schlüssel liegt ausschließlich im Backend. KI-Angaben müssen mit offiziellen Herstellerunterlagen und betrieblichen Vorgaben abgeglichen werden.
+
+
+## Neu in Version 1.5
+
+- echte zweistufige Analyse: zuerst reine Bilderkennung, danach Recherche
+- Websuche kann die visuelle Texterkennung nicht mehr überlagern
+- erkannter Rohtext kann zur Kontrolle aufgeklappt werden
+- sichtbarer Button **Neue Suche** nach jedem Ergebnis
+- Button **Weiteres Foto ergänzen**
+- speziell robuster für Verpackungsetiketten und seitlich fotografierte Typenschilder

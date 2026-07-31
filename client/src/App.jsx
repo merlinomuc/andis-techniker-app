@@ -84,11 +84,12 @@ function App() {
   }
 
   function reset() { setQuery(''); setImages([]); setImageFocus('auto'); setResult(null); setError(''); }
+  function newSearch() { reset(); window.scrollTo({ top: 0, behavior: 'smooth' }); setTimeout(() => galleryRef.current?.focus?.(), 250); }
   function openHistory(item) { setQuery(item.query === 'Fotoanalyse' ? '' : item.query); setMode(item.mode); setImageFocus(item.imageFocus || 'auto'); setResult(item); window.scrollTo({ top: 0, behavior: 'smooth' }); }
   function clearHistory() { setHistory([]); localStorage.removeItem('andi-history'); }
 
   return <>
-    <header><div className="brand"><div className="logo"><Wrench /></div><div><h1>ANDIS</h1><p>TECHNIKER-APP</p></div></div><span className="version">V1.4</span></header>
+    <header><div className="brand"><div className="logo"><Wrench /></div><div><h1>ANDIS</h1><p>TECHNIKER-APP</p></div></div><span className="version">V1.5</span></header>
     <main>
       <section className="hero card tech-grid">
         <div className="system-line"><Cpu size={15}/> TECHNISCHER ASSISTENT <span>ONLINE</span></div>
@@ -121,7 +122,8 @@ function App() {
       {result&&<>{result.imageAssessment&&<section className={`card assessment ${result.imageAssessment.usable?'good':'warning'}`}>{result.imageAssessment.usable?<Check/>:<CircleAlert/>}<div><strong>{result.imageAssessment.usable?'Bilder sind auswertbar':'Bilder reichen nicht für eine sichere Erkennung'}</strong><p>{result.imageAssessment.message}</p>{result.imageAssessment.nextPhoto&&<p className="next-photo"><ImagePlus size={16}/><b>Nächstes Foto:</b> {result.imageAssessment.nextPhoto}</p>}</div></section>}
       <section className="card result"><div className="result-head"><div><span className="eyebrow">ANALYSEERGEBNIS</span><h2>Technische Auswertung</h2></div><ShieldAlert size={28}/></div>
       {(result.imageType || result.extractedIdentifiers?.length>0) && <div className="label-readout"><div className="label-readout-head"><Tags size={18}/><div><span>ERKANNTER BILDTYP</span><strong>{result.imageType || 'Unbekannt'}</strong></div></div>{result.extractedIdentifiers?.length>0&&<div className="identifier-grid">{result.extractedIdentifiers.map((item,i)=><div className="identifier" key={`${item.label}-${i}`}><span>{item.label}</span><strong>{item.value}</strong><small className={`confidence ${item.confidence||'mittel'}`}>{item.confidence||'mittel'}</small></div>)}</div>}</div>}
-      <div className="markdown" dangerouslySetInnerHTML={{__html:marked.parse(result.answer)}}/>{result.recognitionBasis?.length>0&&<details className="recognition"><summary>Warum dieses Ergebnis?</summary><ul>{result.recognitionBasis.map((x,i)=><li key={i}>{x}</li>)}</ul></details>}{result.sources?.length>0&&<div className="sources"><h3>Gefundene Quellen</h3>{result.sources.map((s,i)=><a key={s.url} href={s.url} target="_blank" rel="noreferrer"><span>{i+1}</span><div><strong>{s.title}</strong><small>{new URL(s.url).hostname}</small></div><ChevronRight size={17}/></a>)}</div>}</section></>}
+      {result.rawText?.length>0&&<details className="recognition raw-text"><summary>Erkannten Rohtext anzeigen</summary><ul>{result.rawText.map((x,i)=><li key={i}>{x}</li>)}</ul></details>}
+      <div className="markdown" dangerouslySetInnerHTML={{__html:marked.parse(result.answer)}}/>{result.recognitionBasis?.length>0&&<details className="recognition"><summary>Warum dieses Ergebnis?</summary><ul>{result.recognitionBasis.map((x,i)=><li key={i}>{x}</li>)}</ul></details>}{result.sources?.length>0&&<div className="sources"><h3>Gefundene Quellen</h3>{result.sources.map((s,i)=><a key={s.url} href={s.url} target="_blank" rel="noreferrer"><span>{i+1}</span><div><strong>{s.title}</strong><small>{new URL(s.url).hostname}</small></div><ChevronRight size={17}/></a>)}</div>}<div className="result-actions"><button className="new-search" onClick={newSearch}><Search size={18}/> Neue Suche</button><button className="secondary-search" onClick={()=>{setResult(null);window.scrollTo({top:0,behavior:'smooth'});}}><ImagePlus size={18}/> Weiteres Foto ergänzen</button></div></section></>}
       <section className="safety card"><ShieldAlert/><div><strong>Sicher arbeiten</strong><p>KI-Angaben prüfen. Herstellerunterlagen und betriebliche Vorgaben haben Vorrang.</p></div></section>
       {history.length>0&&<section className="history card"><div className="history-head"><div><History size={20}/><h2>Letzte Analysen</h2></div><button onClick={clearHistory}><Trash2 size={17}/> Löschen</button></div>{history.map(item=><button className="history-item" key={item.id} onClick={()=>openHistory(item)}><strong>{item.query}</strong><span>{item.date}</span></button>)}</section>}
     </main>

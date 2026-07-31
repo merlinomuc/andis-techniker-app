@@ -51,7 +51,7 @@ function parseModelPayload(text) {
   }
 }
 
-app.get('/api/health', (_req, res) => res.json({ ok: true, configured: Boolean(process.env.OPENAI_API_KEY), version: '1.4' }));
+app.get('/api/health', (_req, res) => res.json({ ok: true, configured: Boolean(process.env.OPENAI_API_KEY), version: '1.5' }));
 
 app.post('/api/analyze', async (req, res) => {
   try {
@@ -59,56 +59,77 @@ app.post('/api/analyze', async (req, res) => {
     if (!process.env.OPENAI_API_KEY) return res.status(503).json({ error: 'OPENAI_API_KEY ist auf dem Server noch nicht eingerichtet.' });
 
     const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-    const modeLabels = {
-      identify: 'Bauteil, Gerät, Verpackung oder Typenschild identifizieren und technische Kerndaten erklären',
-      troubleshoot: 'Fehlerbild einordnen und sichere, logisch sortierte Prüfschritte vorschlagen',
-      documents: 'offizielle Datenblätter, Handbücher, Anschlusspläne und Herstellerunterlagen finden',
-      replacement: 'Originalteil, Nachfolger und mögliche kompatible Ersatzprodukte vergleichen'
-    };
+    const model = process.env.OPENAI_MODEL || 'gpt-5-mini';
     const focusLabels = {
       auto: 'Automatisch entscheiden, ob Gerät, Bauteil, Typenschild, Verpackungsetikett oder Display zu sehen ist.',
-      device: 'Das sichtbare Gerät beziehungsweise Bauteil priorisieren; Beschriftungen trotzdem vollständig lesen.',
-      label: 'Typenschild oder Verpackungsetikett priorisieren. Text, Bestellnummern, Modellcodes und Seriennummern exakt lesen.',
-      display: 'Display, Messwert oder Fehlercode priorisieren und Zeichen exakt lesen.'
+      device: 'Das sichtbare Gerät oder Bauteil priorisieren und Beschriftungen vollständig lesen.',
+      label: 'Typenschild oder Verpackungsetikett priorisieren. Artikelnummern, MLFB, P/N, Modellcodes und Seriennummern exakt transkribieren.',
+      display: 'Display, Messwert oder Fehlercode priorisieren und Zeichen exakt transkribieren.'
     };
 
-    const userContent = [{
+    // Stufe 1: reine Bilderkennung ohne Websuche. Dadurch kann die Recherche
+    // die visuelle Transkription nicht überlagern.
+    const visionContent = [{
       type: 'input_text',
-      text: `Aufgabe: ${modeLabels[input.mode]}\nBildfokus: ${focusLabels[input.imageFocus]}\nNutzereingabe/gescannter Code: ${input.query || '(keine zusätzliche Eingabe)'}\nAnzahl Bilder: ${input.images.length}\n\nWICHTIGE ANALYSEABFOLGE:\n1. Bestimme zuerst den Bildtyp: Gerät/Bauteil, Typenschild, Verpackungsetikett, Display/Fehlercode, technische Zeichnung oder unbekannt. Ein Gerät muss nicht sichtbar sein; eine Verpackung mit Etikett ist ein gültiges Identifikationsziel.\n2. Suche gezielt nach Etiketten, Barcodes und daneben gedruckten Klartextangaben. Drehe schrägen oder seitlichen Text gedanklich in Leserichtung.\n3. Lies Hersteller, Produktfamilie, Modell, Bestellnummer, P/N, MLFB, Type, Seriennummer und Fehlercode so exakt wie sichtbar. Barcodes nicht erraten; priorisiere den lesbaren Klartext daneben.\n4. Prüfe typische industrielle Nummernformate. Bei Siemens sind beispielsweise Zeichenfolgen wie 6ES7..., 6SL..., 3RT... oder 7ML... häufig Bestellnummern. Erfinde niemals fehlende Zeichen.\n5. Arbeite von grob nach genau und liefere auch bei Unsicherheit eine Objektklasse, sichtbare Texte und einen konkreten Vorschlag für ein besseres Foto.\n6. Nutze erst nach der Texterfassung eine Websuche. Suche bevorzugt mit der exakten Hersteller- und Bestellnummer und bevorzuge offizielle Herstellerquellen.`
+      text: `Analysiere die Bilder ausschließlich visuell. Bildfokus: ${focusLabels[input.imageFocus]}\nZusätzliche Nutzereingabe: ${input.query || '(keine)'}\n\nPflichtablauf:\n1. Bestimme den Bildtyp. Auch ein Karton mit Etikett ist ein gültiges technisches Identifikationsziel.\n2. Lies zuerst sämtlichen sichtbaren Klartext. Drehe seitlichen Text gedanklich.\n3. Suche besonders nach Hersteller, Produktfamilie, Bestellnummer, MLFB, P/N, TYPE, MODEL, Seriennummer und Fehlercode.\n4. Bei Siemens sind Formate wie 6ES7..., 6SL..., 3RT... und 7ML... oft Bestellnummern.\n5. Nichts ergänzen oder erraten. Unsichere Zeichen mit ? markieren.\n6. Selbst wenn das genaue Modell unklar bleibt, mindestens Objektklasse, sichtbare Wörter und das benötigte Zusatzfoto nennen.`
     }];
-
     const detail = input.imageFocus === 'label' || input.imageFocus === 'display' ? 'high' : 'auto';
-    for (const image of input.images) userContent.push({ type: 'input_image', image_url: image, detail });
+    for (const image of input.images) visionContent.push({ type: 'input_image', image_url: image, detail });
 
-    const response = await openai.responses.create({
-      model: process.env.OPENAI_MODEL || 'gpt-5-mini',
-      tools: [{ type: 'web_search' }],
-      instructions: `Du bist der Analyse-Assistent in "Andis Techniker-App". Antworte ausschließlich als gültiges JSON-Objekt ohne Codeblock:
-{
-  "answer": "kompakte Markdown-Antwort",
-  "imageType": "Gerät/Bauteil | Typenschild | Verpackungsetikett | Display/Fehlercode | Technische Zeichnung | Unbekannt",
-  "extractedIdentifiers": [
-    {"label":"Hersteller", "value":"...", "confidence":"hoch|mittel|niedrig"},
-    {"label":"Bestellnummer", "value":"...", "confidence":"hoch|mittel|niedrig"}
-  ],
-  "imageAssessment": null oder {"usable":true/false, "message":"kurze ehrliche Beurteilung", "nextPhoto":"konkrete gewünschte Ansicht oder leer"},
-  "recognitionBasis": ["2 bis 5 kurze beobachtbare Merkmale"]
-}
-
-Die Markdown-Antwort nutzt passende Abschnitte wie ## Erkannt, ## Technische Einordnung, ## Dokumente und ## Nächste Schritte. extractedIdentifiers enthält ausschließlich tatsächlich lesbare oder sehr klar abgeleitete Angaben; keine erfundenen Teilenummern. Bei einem Karton oder einer Verpackung identifiziere anhand des Etiketts und sage transparent, dass das Gerät selbst nicht sichtbar ist. Wenn eine Nummer nur teilweise lesbar ist, verwende ? für unsichere Zeichen oder lasse sie weg. Unterscheide sichtbar/gesichert von wahrscheinlich/vermutet. recognitionBasis enthält keine internen Gedankengänge. Bei Gefahren sichere Hinweise geben.`,
-      input: [{ role: 'user', content: userContent }],
-      max_output_tokens: 1500
+    const visionResponse = await openai.responses.create({
+      model,
+      instructions: `Du bist ein präziser technischer Bildleser. Antworte ausschließlich mit gültigem JSON ohne Codeblock:\n{\n  "imageType":"Gerät/Bauteil | Typenschild | Verpackungsetikett | Display/Fehlercode | Technische Zeichnung | Unbekannt",\n  "objectClass":"kurze Objektklasse oder Unbekannt",\n  "rawText":["jede tatsächlich sichtbare Textzeile"],\n  "extractedIdentifiers":[{"label":"Hersteller|Produktfamilie|Bestellnummer|Modell|Seriennummer|Fehlercode|Sonstiges","value":"...","confidence":"hoch|mittel|niedrig"}],\n  "imageAssessment":{"usable":true,"message":"ehrliche kurze Beurteilung","nextPhoto":"konkrete gewünschte Ansicht oder leer"},\n  "recognitionBasis":["2 bis 5 direkt beobachtbare Merkmale"]\n}\nKeine Webrecherche, keine Produktkenntnisse ergänzen und keine Nummern vervollständigen.`,
+      input: [{ role: 'user', content: visionContent }],
+      max_output_tokens: 700
     });
 
-    const payload = parseModelPayload(response.output_text || '');
+    const vision = parseModelPayload(visionResponse.output_text || '');
+    const identifiers = Array.isArray(vision.extractedIdentifiers) ? vision.extractedIdentifiers.slice(0, 12) : [];
+    const rawText = Array.isArray(vision.rawText) ? vision.rawText.slice(0, 30) : [];
+    const searchSeed = [input.query, ...identifiers.map(x => `${x.label}: ${x.value}`), ...rawText].filter(Boolean).join('\n');
+
+    let answer = '';
+    let sources = [];
+    let researchResponseId = null;
+
+    // Stufe 2: nur mit den bereits gelesenen Angaben recherchieren.
+    // Kein zweiter Bild-Upload, daher bleibt der Zusatzverbrauch begrenzt.
+    if (searchSeed.trim()) {
+      const modeLabels = {
+        identify: 'Identifiziere das Produkt und erkläre die wichtigsten technischen Kerndaten.',
+        troubleshoot: 'Ordne das Fehlerbild ein und nenne sichere, logisch sortierte Prüfschritte.',
+        documents: 'Finde bevorzugt offizielle Datenblätter, Handbücher, Anschlusspläne und Herstellerunterlagen.',
+        replacement: 'Vergleiche Originalteil, offiziellen Nachfolger und mögliche kompatible Ersatzprodukte.'
+      };
+      const research = await openai.responses.create({
+        model,
+        tools: [{ type: 'web_search' }],
+        instructions: `Du bist der Recherche-Assistent in Andis Techniker-App. Verwende ausschließlich die übermittelten, visuell gelesenen Angaben. Erfinde keine fehlenden Zeichen. Bevorzuge offizielle Herstellerquellen. Antworte als gut lesbares Markdown mit den Abschnitten ## Erkannt, ## Technische Einordnung, ## Dokumente und ## Nächste Schritte. Kennzeichne Unsicherheit deutlich.`,
+        input: `${modeLabels[input.mode]}\n\nVisuell gelesene Angaben:\n${searchSeed}\n\nBildtyp: ${vision.imageType || 'Unbekannt'}\nObjektklasse: ${vision.objectClass || 'Unbekannt'}`,
+        max_output_tokens: 1100
+      });
+      answer = research.output_text || '';
+      sources = extractSources(research);
+      researchResponseId = research.id;
+    }
+
+    if (!answer) {
+      const idLines = identifiers.map(x => `- **${x.label}:** ${x.value} (${x.confidence || 'mittel'})`).join('\n');
+      answer = `## Visuelle Erkennung\n${vision.objectClass ? `**Objektklasse:** ${vision.objectClass}\n\n` : ''}${idLines || 'Es konnten keine eindeutigen Kennzeichnungen gelesen werden.'}\n\n## Nächste Schritte\n${vision.imageAssessment?.nextPhoto || 'Bitte eine gerade, helle Nahaufnahme der Beschriftung oder Modellnummer ergänzen.'}`;
+    }
+
     res.json({
-      answer: payload.answer || 'Keine auswertbare Antwort erhalten.',
-      imageType: payload.imageType || 'Unbekannt',
-      extractedIdentifiers: Array.isArray(payload.extractedIdentifiers) ? payload.extractedIdentifiers.slice(0, 10) : [],
-      imageAssessment: input.images.length ? payload.imageAssessment : null,
-      recognitionBasis: Array.isArray(payload.recognitionBasis) ? payload.recognitionBasis.slice(0, 6) : [],
-      sources: extractSources(response),
-      responseId: response.id
+      answer,
+      imageType: vision.imageType || 'Unbekannt',
+      objectClass: vision.objectClass || 'Unbekannt',
+      rawText,
+      extractedIdentifiers: identifiers,
+      imageAssessment: input.images.length ? (vision.imageAssessment || null) : null,
+      recognitionBasis: Array.isArray(vision.recognitionBasis) ? vision.recognitionBasis.slice(0, 6) : [],
+      sources,
+      responseId: researchResponseId || visionResponse.id,
+      visionResponseId: visionResponse.id,
+      pipeline: 'two-pass'
     });
   } catch (error) {
     console.error(error);
@@ -120,4 +141,4 @@ Die Markdown-Antwort nutzt passende Abschnitte wie ## Erkannt, ## Technische Ein
 
 app.use(express.static(clientDist));
 app.use((_req, res) => res.sendFile(path.join(clientDist, 'index.html')));
-app.listen(port, () => console.log(`Andis Techniker-App v1.4 läuft auf Port ${port}`));
+app.listen(port, () => console.log(`Andis Techniker-App v1.5 läuft auf Port ${port}`));
