@@ -60,3 +60,12 @@ Diese Version installiert die Abhängigkeiten von `server` und `client` ausdrüc
 - mögliche Kandidaten statt komplettem Abbruch bei Unsicherheit
 - aufklappbare Erklärung „Warum dieses Ergebnis?“
 - Bilddetail `auto` und kürzere Maximalantwort zur Reduzierung des Verbrauchs
+
+## Version 1.3
+
+- getrennte Schaltflächen für Kamera und Galerie
+- Auswahl von bis zu vier Bildern
+- Kombination aus Gesamtansicht, Typenschild und Rückseite
+- lokale Bildverkleinerung vor dem Upload
+- technische, dunkle Benutzeroberfläche
+- weiterhin nur ein Analyseaufruf pro Vorgang

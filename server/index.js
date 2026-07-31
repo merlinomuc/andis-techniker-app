@@ -20,8 +20,8 @@ app.use(express.json({ limit: '14mb' }));
 const requestSchema = z.object({
   query: z.string().trim().max(1000).optional().default(''),
   mode: z.enum(['identify', 'troubleshoot', 'documents', 'replacement']).optional().default('identify'),
-  imageDataUrl: z.string().startsWith('data:image/').max(12_000_000).optional()
-}).refine((value) => value.query || value.imageDataUrl, { message: 'Bitte Text oder ein Bild übermitteln.' });
+  images: z.array(z.string().startsWith('data:image/').max(5_000_000)).max(4).optional().default([])
+}).refine((value) => value.query || value.images.length, { message: 'Bitte Text oder ein Bild übermitteln.' });
 
 function extractSources(response) {
   const sources = new Map();
@@ -50,7 +50,7 @@ function parseModelPayload(text) {
   }
 }
 
-app.get('/api/health', (_req, res) => res.json({ ok: true, configured: Boolean(process.env.OPENAI_API_KEY), version: '1.2' }));
+app.get('/api/health', (_req, res) => res.json({ ok: true, configured: Boolean(process.env.OPENAI_API_KEY), version: '1.3' }));
 
 app.post('/api/analyze', async (req, res) => {
   try {
@@ -67,10 +67,10 @@ app.post('/api/analyze', async (req, res) => {
 
     const userContent = [{
       type: 'input_text',
-      text: `Aufgabe: ${modeLabels[input.mode]}\nNutzereingabe/gescannter Code: ${input.query || '(keine zusätzliche Eingabe)'}\nBild vorhanden: ${input.imageDataUrl ? 'ja' : 'nein'}\n\nArbeite von grob nach genau: Objektklasse, sichtbare Logos/Texte, Hersteller/Serie, Modellnummer, mögliche Kandidaten. Wenn das genaue Modell nicht sicher bestimmbar ist, liefere trotzdem die sicher erkennbare Objektklasse und bis zu drei klar als Vermutung bezeichnete Kandidaten. Sage konkret, welche Ansicht oder Kennzeichnung auf einem Zusatzfoto benötigt wird. Nutze Websuche nur, wenn eine konkrete Hersteller-, Modell-, Dokument-, Fehlercode- oder Ersatzteilsuche sinnvoll ist; bevorzuge offizielle Herstellerquellen.`
+      text: `Aufgabe: ${modeLabels[input.mode]}\nNutzereingabe/gescannter Code: ${input.query || '(keine zusätzliche Eingabe)'}\nAnzahl Bilder: ${input.images.length}\n\nArbeite von grob nach genau: Objektklasse, sichtbare Logos/Texte, Hersteller/Serie, Modellnummer, mögliche Kandidaten. Wenn das genaue Modell nicht sicher bestimmbar ist, liefere trotzdem die sicher erkennbare Objektklasse und bis zu drei klar als Vermutung bezeichnete Kandidaten. Sage konkret, welche Ansicht oder Kennzeichnung auf einem Zusatzfoto benötigt wird. Nutze Websuche nur, wenn eine konkrete Hersteller-, Modell-, Dokument-, Fehlercode- oder Ersatzteilsuche sinnvoll ist; bevorzuge offizielle Herstellerquellen.`
     }];
 
-    if (input.imageDataUrl) userContent.push({ type: 'input_image', image_url: input.imageDataUrl, detail: 'auto' });
+    for (const image of input.images) userContent.push({ type: 'input_image', image_url: image, detail: 'auto' });
 
     const response = await openai.responses.create({
       model: process.env.OPENAI_MODEL || 'gpt-5-mini',
@@ -82,7 +82,7 @@ app.post('/api/analyze', async (req, res) => {
   "recognitionBasis": ["2 bis 5 kurze, für Nutzer verständliche Beobachtungen"]
 }
 
-Die Markdown-Antwort nutzt passende Abschnitte wie ## Erkannt, ## Wahrscheinliche Zuordnung, ## Technische Hinweise, ## Dokumente, ## Nächste sichere Schritte. Unterscheide sichtbar/gesichert von wahrscheinlich/vermutet. Erfinde keine Teilenummern. Bei schlechtem, unscharfem, zu weitem, verdecktem oder spiegelndem Bild: nicht einfach scheitern; nenne die grobe Objektklasse, soweit möglich, und verlange ein konkretes besseres Foto. recognitionBasis enthält nur beobachtbare Merkmale und eine knappe Begründung, niemals interne Gedankengänge. Bei Gefahren sichere Hinweise geben.`,
+Die Markdown-Antwort nutzt passende Abschnitte wie ## Erkannt, ## Wahrscheinliche Zuordnung, ## Technische Hinweise, ## Dokumente, ## Nächste sichere Schritte. Unterscheide sichtbar/gesichert von wahrscheinlich/vermutet. Erfinde keine Teilenummern. Beziehe alle übermittelten Bilder gemeinsam ein. Bei schlechtem, unscharfem, zu weitem, verdecktem oder spiegelndem Bild: nicht einfach scheitern; nenne die grobe Objektklasse, soweit möglich, und verlange ein konkretes besseres Foto. recognitionBasis enthält nur beobachtbare Merkmale und eine knappe Begründung, niemals interne Gedankengänge. Bei Gefahren sichere Hinweise geben.`,
       input: [{ role: 'user', content: userContent }],
       max_output_tokens: 1400
     });
@@ -90,7 +90,7 @@ Die Markdown-Antwort nutzt passende Abschnitte wie ## Erkannt, ## Wahrscheinlich
     const payload = parseModelPayload(response.output_text || '');
     res.json({
       answer: payload.answer || 'Keine auswertbare Antwort erhalten.',
-      imageAssessment: input.imageDataUrl ? payload.imageAssessment : null,
+      imageAssessment: input.images.length ? payload.imageAssessment : null,
       recognitionBasis: Array.isArray(payload.recognitionBasis) ? payload.recognitionBasis.slice(0, 6) : [],
       sources: extractSources(response),
       responseId: response.id
@@ -105,4 +105,4 @@ Die Markdown-Antwort nutzt passende Abschnitte wie ## Erkannt, ## Wahrscheinlich
 
 app.use(express.static(clientDist));
 app.use((_req, res) => res.sendFile(path.join(clientDist, 'index.html')));
-app.listen(port, () => console.log(`Andis Techniker-App v1.2 läuft auf Port ${port}`));
+app.listen(port, () => console.log(`Andis Techniker-App v1.3 läuft auf Port ${port}`));
