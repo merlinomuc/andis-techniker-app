@@ -1,8 +1,8 @@
-# Andis Techniker-App – Version 1.5
+# Andis Techniker-App – Version 1.6
 
 Mobile-first PWA zur Identifikation technischer Geräte, Bauteile, Typenschilder, Verpackungsetiketten, Displays sowie QR- und Barcodes.
 
-## Neu in Version 1.5
+## Neu in Version 1.6
 
 - eigener Bildfokus: **Automatisch**, **Gerät**, **Etikett / Typenschild** oder **Display / Fehlercode**
 - Verpackungskartons und Produktetiketten gelten ausdrücklich als Identifikationsziel
@@ -68,7 +68,7 @@ Für kleine Typenschilder oder Verpackungslabels den Modus **Etikett / Typenschi
 Der OpenAI-API-Schlüssel liegt ausschließlich im Backend. KI-Angaben müssen mit offiziellen Herstellerunterlagen und betrieblichen Vorgaben abgeglichen werden.
 
 
-## Neu in Version 1.5
+## Neu in Version 1.6
 
 - echte zweistufige Analyse: zuerst reine Bilderkennung, danach Recherche
 - Websuche kann die visuelle Texterkennung nicht mehr überlagern
@@ -76,3 +76,22 @@ Der OpenAI-API-Schlüssel liegt ausschließlich im Backend. KI-Angaben müssen m
 - sichtbarer Button **Neue Suche** nach jedem Ergebnis
 - Button **Weiteres Foto ergänzen**
 - speziell robuster für Verpackungsetiketten und seitlich fotografierte Typenschilder
+
+
+## Neu in Version 1.6
+
+- Structured Outputs mit strengem JSON-Schema für die visuelle Erkennung
+- Fallback-Auswertung, falls eine Modellantwort trotzdem kein gültiges JSON ist
+- automatischer zweiter Leseversuch bei leerer Erkennung; nur dann entsteht ein zusätzlicher API-Aufruf
+- zweiter Versuch behandelt das Bild gezielt als Dokument oder Verpackungsetikett und nutzt hohe Bilddetails
+- Diagnosebereich mit Parse-Status, Retry-Status, Pipeline und technischer Rohantwort
+- erkannte Siemens- und weitere typische Industrienummern werden im Fallback aus Freitext gerettet
+- `Neue Suche` bleibt direkt im Ergebnis verfügbar
+
+### Testfall Siemens-Verpackung
+
+Beim mitgelieferten Analyseablauf wird ein seitlich aufgenommenes Verpackungsetikett gezielt nach Hersteller, Produktfamilie und Bestellnummer untersucht. Erwartete sichtbare Angaben des Testfotos sind unter anderem `SIEMENS`, `SIMATIC S7-300` und `6ES7 318-3FL01-0AB0`.
+
+### Diagnose
+
+Nach einer Analyse kann der Bereich **Diagnoseinformationen** geöffnet werden. `Auswertung: json` bedeutet, dass das Structured Output korrekt verarbeitet wurde. `Zweiter Leseversuch: Ja` bedeutet, dass der erste Versuch leer war und automatisch ein engerer, hochauflösender Leseversuch ausgeführt wurde.

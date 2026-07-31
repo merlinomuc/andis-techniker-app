@@ -42,16 +42,89 @@ function extractSources(response) {
   return [...sources.values()].slice(0, 10);
 }
 
-function parseModelPayload(text) {
-  try {
-    const clean = text.trim().replace(/^```json\s*/i, '').replace(/\s*```$/, '');
-    return JSON.parse(clean);
-  } catch {
-    return { answer: text, imageAssessment: null, recognitionBasis: [], imageType: 'Unbekannt', extractedIdentifiers: [] };
-  }
+const emptyVision = () => ({
+  imageType: 'Unbekannt', objectClass: 'Unbekannt', rawText: [], extractedIdentifiers: [],
+  imageAssessment: null, recognitionBasis: []
+});
+
+function normalizeVision(value) {
+  const base = emptyVision();
+  if (!value || typeof value !== 'object') return base;
+  return {
+    imageType: typeof value.imageType === 'string' && value.imageType.trim() ? value.imageType.trim() : base.imageType,
+    objectClass: typeof value.objectClass === 'string' && value.objectClass.trim() ? value.objectClass.trim() : base.objectClass,
+    rawText: Array.isArray(value.rawText) ? value.rawText.filter(x => typeof x === 'string' && x.trim()).map(x => x.trim()).slice(0, 40) : [],
+    extractedIdentifiers: Array.isArray(value.extractedIdentifiers) ? value.extractedIdentifiers.filter(x => x && typeof x.value === 'string' && x.value.trim()).map(x => ({
+      label: typeof x.label === 'string' && x.label.trim() ? x.label.trim() : 'Sonstiges',
+      value: x.value.trim(),
+      confidence: ['hoch', 'mittel', 'niedrig'].includes(x.confidence) ? x.confidence : 'mittel'
+    })).slice(0, 16) : [],
+    imageAssessment: value.imageAssessment && typeof value.imageAssessment === 'object' ? {
+      usable: Boolean(value.imageAssessment.usable),
+      message: typeof value.imageAssessment.message === 'string' ? value.imageAssessment.message.trim() : '',
+      nextPhoto: typeof value.imageAssessment.nextPhoto === 'string' ? value.imageAssessment.nextPhoto.trim() : ''
+    } : null,
+    recognitionBasis: Array.isArray(value.recognitionBasis) ? value.recognitionBasis.filter(x => typeof x === 'string' && x.trim()).map(x => x.trim()).slice(0, 8) : []
+  };
 }
 
-app.get('/api/health', (_req, res) => res.json({ ok: true, configured: Boolean(process.env.OPENAI_API_KEY), version: '1.5' }));
+function fallbackFromText(text) {
+  const result = emptyVision();
+  const clean = String(text || '').replace(/```(?:json)?/gi, '').trim();
+  if (!clean) return result;
+  const lines = clean.split(/\r?\n/).map(x => x.replace(/^[-*•\s]+/, '').trim()).filter(Boolean);
+  const identifiers = [];
+  const patterns = [
+    ['Bestellnummer', /\b(?:6ES7|6SL|3RT|7ML)[A-Z0-9 .\-]{5,25}\b/gi],
+    ['Modell', /\b(?:RD|FD|SL|BR|FC)-[A-Z0-9-]{2,15}\b/gi],
+    ['Fehlercode', /\b(?:F|E|A)\d{2,6}\b/gi]
+  ];
+  for (const [label, regex] of patterns) {
+    for (const match of clean.match(regex) || []) identifiers.push({ label, value: match.replace(/\s+/g, ' ').trim(), confidence: 'mittel' });
+  }
+  if (/SIEMENS/i.test(clean)) identifiers.unshift({ label: 'Hersteller', value: 'Siemens', confidence: 'hoch' });
+  if (/SIMATIC\s*S7[- ]?300/i.test(clean)) identifiers.push({ label: 'Produktfamilie', value: 'SIMATIC S7-300', confidence: 'hoch' });
+  result.rawText = lines.slice(0, 30);
+  result.extractedIdentifiers = [...new Map(identifiers.map(x => [`${x.label}:${x.value}`, x])).values()].slice(0, 12);
+  result.objectClass = result.extractedIdentifiers.length ? 'Technisches Produkt oder Produktetikett' : 'Unbekannt';
+  result.imageType = /barcode|etikett|label|bestellnummer|seriennummer|SIEMENS/i.test(clean) ? 'Verpackungsetikett' : 'Unbekannt';
+  result.imageAssessment = { usable: result.extractedIdentifiers.length > 0, message: 'Die strukturierte Ausgabe war nicht vollständig. Verwertbare Angaben wurden aus der Rohantwort gerettet.', nextPhoto: '' };
+  result.recognitionBasis = result.extractedIdentifiers.map(x => `${x.label}: ${x.value}`).slice(0, 5);
+  return result;
+}
+
+function parseVisionPayload(text) {
+  const raw = String(text || '').trim();
+  if (!raw) return { vision: emptyVision(), parseStatus: 'empty', parseError: 'Leere Modellantwort' };
+  const candidates = [raw.replace(/^```json\s*/i, '').replace(/\s*```$/, '')];
+  const first = raw.indexOf('{'); const last = raw.lastIndexOf('}');
+  if (first >= 0 && last > first) candidates.push(raw.slice(first, last + 1));
+  for (const candidate of candidates) {
+    try { return { vision: normalizeVision(JSON.parse(candidate)), parseStatus: 'json', parseError: '' }; }
+    catch (error) { /* nächsten Kandidaten versuchen */ }
+  }
+  return { vision: fallbackFromText(raw), parseStatus: 'fallback', parseError: 'Antwort war kein gültiges JSON' };
+}
+
+const visionSchema = {
+  type: 'object', additionalProperties: false,
+  properties: {
+    imageType: { type: 'string', enum: ['Gerät/Bauteil', 'Typenschild', 'Verpackungsetikett', 'Display/Fehlercode', 'Technische Zeichnung', 'Unbekannt'] },
+    objectClass: { type: 'string' },
+    rawText: { type: 'array', items: { type: 'string' } },
+    extractedIdentifiers: { type: 'array', items: { type: 'object', additionalProperties: false, properties: {
+      label: { type: 'string', enum: ['Hersteller', 'Produktfamilie', 'Bestellnummer', 'Modell', 'Seriennummer', 'Fehlercode', 'Sonstiges'] },
+      value: { type: 'string' }, confidence: { type: 'string', enum: ['hoch', 'mittel', 'niedrig'] }
+    }, required: ['label', 'value', 'confidence'] } },
+    imageAssessment: { type: 'object', additionalProperties: false, properties: {
+      usable: { type: 'boolean' }, message: { type: 'string' }, nextPhoto: { type: 'string' }
+    }, required: ['usable', 'message', 'nextPhoto'] },
+    recognitionBasis: { type: 'array', items: { type: 'string' } }
+  },
+  required: ['imageType', 'objectClass', 'rawText', 'extractedIdentifiers', 'imageAssessment', 'recognitionBasis']
+};
+
+app.get('/api/health', (_req, res) => res.json({ ok: true, configured: Boolean(process.env.OPENAI_API_KEY), version: '1.6' }));
 
 app.post('/api/analyze', async (req, res) => {
   try {
@@ -76,14 +149,55 @@ app.post('/api/analyze', async (req, res) => {
     const detail = input.imageFocus === 'label' || input.imageFocus === 'display' ? 'high' : 'auto';
     for (const image of input.images) visionContent.push({ type: 'input_image', image_url: image, detail });
 
-    const visionResponse = await openai.responses.create({
-      model,
-      instructions: `Du bist ein präziser technischer Bildleser. Antworte ausschließlich mit gültigem JSON ohne Codeblock:\n{\n  "imageType":"Gerät/Bauteil | Typenschild | Verpackungsetikett | Display/Fehlercode | Technische Zeichnung | Unbekannt",\n  "objectClass":"kurze Objektklasse oder Unbekannt",\n  "rawText":["jede tatsächlich sichtbare Textzeile"],\n  "extractedIdentifiers":[{"label":"Hersteller|Produktfamilie|Bestellnummer|Modell|Seriennummer|Fehlercode|Sonstiges","value":"...","confidence":"hoch|mittel|niedrig"}],\n  "imageAssessment":{"usable":true,"message":"ehrliche kurze Beurteilung","nextPhoto":"konkrete gewünschte Ansicht oder leer"},\n  "recognitionBasis":["2 bis 5 direkt beobachtbare Merkmale"]\n}\nKeine Webrecherche, keine Produktkenntnisse ergänzen und keine Nummern vervollständigen.`,
-      input: [{ role: 'user', content: visionContent }],
-      max_output_tokens: 700
-    });
+    async function runVisionAttempt(extraInstruction = '') {
+      return openai.responses.create({
+        model,
+        instructions: `Du bist ein präziser technischer Bildleser. Keine Webrecherche und keine Produktdaten ergänzen. Lies sichtbaren Text exakt. ${extraInstruction}`,
+        input: [{ role: 'user', content: visionContent }],
+        text: { format: { type: 'json_schema', name: 'technical_image_readout', strict: true, schema: visionSchema } },
+        max_output_tokens: 900
+      });
+    }
 
-    const vision = parseModelPayload(visionResponse.output_text || '');
+    let visionResponse;
+    let parsed;
+    let retryUsed = false;
+    try {
+      visionResponse = await runVisionAttempt();
+      parsed = parseVisionPayload(visionResponse.output_text || '');
+    } catch (structuredError) {
+      // Kompatibilitäts-Fallback für ältere SDK-/Modellkonfigurationen.
+      visionResponse = await openai.responses.create({
+        model,
+        instructions: 'Antworte ausschließlich als gültiges JSON entsprechend dem im Nutzertext beschriebenen Schema. Keine Markdown-Codeblöcke.',
+        input: [{ role: 'user', content: visionContent }],
+        max_output_tokens: 900
+      });
+      parsed = parseVisionPayload(visionResponse.output_text || '');
+      parsed.parseError = `Structured Output nicht verfügbar: ${structuredError?.message || 'unbekannt'}. ${parsed.parseError || ''}`.trim();
+    }
+
+    let vision = parsed.vision;
+    const hasUsefulVision = () => vision.rawText.length > 0 || vision.extractedIdentifiers.length > 0 || (vision.objectClass && vision.objectClass !== 'Unbekannt');
+    if (input.images.length && !hasUsefulVision()) {
+      retryUsed = true;
+      const retryContent = [{ type: 'input_text', text: `Zweiter, besonders konservativer Leseversuch. Behandle das Bild zuerst als Dokument oder Verpackungsetikett. Suche den kleineren hellen Etikettenbereich im Gesamtbild, drehe ihn gedanklich und transkribiere besonders Siemens-/Industrie-Bestellnummern. Nutzereingabe: ${input.query || '(keine)'}` }];
+      for (const image of input.images) retryContent.push({ type: 'input_image', image_url: image, detail: 'high' });
+      const retryResponse = await openai.responses.create({
+        model,
+        instructions: 'Lies nur sichtbar vorhandenen Text. Antworte ausschließlich im verlangten JSON-Schema. Nichts erraten.',
+        input: [{ role: 'user', content: retryContent }],
+        text: { format: { type: 'json_schema', name: 'technical_image_retry', strict: true, schema: visionSchema } },
+        max_output_tokens: 900
+      });
+      const retryParsed = parseVisionPayload(retryResponse.output_text || '');
+      if (retryParsed.vision.rawText.length || retryParsed.vision.extractedIdentifiers.length) {
+        visionResponse = retryResponse;
+        parsed = retryParsed;
+        vision = retryParsed.vision;
+      }
+    }
+
     const identifiers = Array.isArray(vision.extractedIdentifiers) ? vision.extractedIdentifiers.slice(0, 12) : [];
     const rawText = Array.isArray(vision.rawText) ? vision.rawText.slice(0, 30) : [];
     const searchSeed = [input.query, ...identifiers.map(x => `${x.label}: ${x.value}`), ...rawText].filter(Boolean).join('\n');
@@ -129,7 +243,13 @@ app.post('/api/analyze', async (req, res) => {
       sources,
       responseId: researchResponseId || visionResponse.id,
       visionResponseId: visionResponse.id,
-      pipeline: 'two-pass'
+      pipeline: retryUsed ? 'two-pass-with-vision-retry' : 'two-pass',
+      diagnostics: {
+        parseStatus: parsed.parseStatus,
+        parseError: parsed.parseError || '',
+        retryUsed,
+        visionRawResponse: String(visionResponse.output_text || '').slice(0, 6000)
+      }
     });
   } catch (error) {
     console.error(error);
@@ -141,4 +261,4 @@ app.post('/api/analyze', async (req, res) => {
 
 app.use(express.static(clientDist));
 app.use((_req, res) => res.sendFile(path.join(clientDist, 'index.html')));
-app.listen(port, () => console.log(`Andis Techniker-App v1.5 läuft auf Port ${port}`));
+app.listen(port, () => console.log(`Andis Techniker-App v1.6 läuft auf Port ${port}`));
