@@ -1,0 +1,8 @@
+[
+  {"query":"6ES7 151-3BA23-0AB0","expectedProvider":"siemens","expectedPartNumber":"6ES7 151-3BA23-0AB0"},
+  {"query":"Siemens SITOP 6EP1 436-3BA00","expectedProvider":"siemens","expectedPartNumber":"6EP1 436-3BA00"},
+  {"query":"Shimano Deore LX RD-M581","expectedProvider":"shimano","expectedPartNumber":"RD-M581"},
+  {"query":"Phoenix Contact MCR-f-UI-DC","expectedProvider":"phoenix"},
+  {"query":"HEIDENHAIN Gateway Profibus DP EnDat22 PDP03","expectedProvider":"heidenhain"},
+  {"query":"Schneider ZCP21","expectedProvider":"schneider"}
+]

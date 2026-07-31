@@ -1,0 +1,16 @@
+[
+  {"id":"pfeiffer-pbt200","required":{"manufacturer":"Pfeiffer Vacuum","model":"PBT 200 PN"},"bonus":["P/N 2000202147","Range 1.0x10^-4 - 1000 hPa"]},
+  {"id":"siemens-6es7-321","required":{"manufacturer":"Siemens","partNumber":"6ES7 321-1BL00-0AA0"}},
+  {"id":"pfeiffer-dcu","required":{"manufacturer":"Pfeiffer Vacuum","objectClass":"Vakuum-Mess-/Steuergerät"},"bonus":["DualGauge TPG 2","Displaywert 8.8"]},
+  {"id":"siemens-6es7-322","required":{"manufacturer":"Siemens","partNumber":"6ES7 322-1BL00-0AA0"}},
+  {"id":"siemens-cpu1516","required":{"manufacturer":"Siemens","model":"CPU 1516F-3 PN/DP","partNumber":"6ES7 516-3FN02-0AB0"}},
+  {"id":"siemens-et200s","required":{"manufacturer":"Siemens","productFamily":"ET 200S","partNumber":"6ES7 151-3BA23-0AB0"}},
+  {"id":"siemens-6es7-153","required":{"manufacturer":"Siemens","partNumber":"6ES7 153-4BA00-0XB0"}},
+  {"id":"heidenhain-gateway","required":{"manufacturer":"HEIDENHAIN","model":"PDP03","partNumber":"1321290-01"},"bonus":["SN 82393729"]},
+  {"id":"siemens-6es7-138","required":{"manufacturer":"Siemens","partNumber":"6ES7 138-4DC00-0AB0"}},
+  {"id":"gossen-profitest","required":{"manufacturer":"Gossen Metrawatt","productFamily":"PROFITEST MTECH"},"bonus":["20.4 mA","RE <3 Ohm"]},
+  {"id":"schneider-zcp21","required":{"manufacturer":"Schneider Electric","model":"ZCP21","objectClass":"Positionsschalter"}},
+  {"id":"phoenix-mcr","required":{"manufacturer":"Phoenix Contact","model":"MCR-f-UI-DC"},"bonus":["216.6 Hz"]},
+  {"id":"siemens-op7","required":{"manufacturer":"Siemens","productFamily":"SIMATIC OP7"},"bonus":["READY FOR TRANSFER"]},
+  {"id":"siemens-sitop","required":{"manufacturer":"Siemens","productFamily":"SITOP","partNumber":"6EP1 436-3BA00"},"bonus":["24 V / 20 A"]}
+]

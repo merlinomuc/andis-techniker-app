@@ -1,80 +1,38 @@
-# Andis Techniker-App v2.0
+# Andis Techniker-App 3.0
 
-Version 2.0 trennt erstmals die visuelle Erkennung vollständig von der Produktrecherche.
+Version 3.0 verbindet zwei gleichwertige Einstiege:
 
-## Neuer Ablauf
+1. **Typ eingeben** – Hersteller, Modell, Bestellnummer oder Fehlercode direkt suchen.
+2. **Foto analysieren** – Bild lesen, erkannte Daten bestätigen und anschließend recherchieren.
 
-1. **Bild lesen** – Fotos werden ohne Websuche analysiert.
-2. **Daten prüfen** – Hersteller, Produktfamilie, Bestellnummer, Modell und Seriennummer sind bearbeitbar.
-3. **Produkt recherchieren** – Erst nach Bestätigung startet die Websuche.
+## Neue Recherchelogik
 
-Ein Recherchefehler kann dadurch kein bereits erkanntes Typenschild mehr überschreiben.
+Die Recherche läuft stufenweise von innen nach außen:
 
-## Neue Funktionen
+1. Bekannten Hersteller aus Typ, Modell oder Bestellnummer ableiten.
+2. Offizielle Herstellerdomains mit exakter Nummer durchsuchen.
+3. Danach autorisierte Distributoren, technische Kataloge und weitere belastbare Internetquellen ergänzen.
+4. Offizielle und zusätzliche Quellen getrennt darstellen.
 
-- Kamera, Galerie und QR-/Barcodescanner
-- bis zu vier Bilder
-- Bilder links/rechts drehen
-- frei wählbarer Etikettenausschnitt
-- getrennte API-Endpunkte `/api/vision/read` und `/api/research/product`
-- eindeutige Fehlercodes statt falschem „Unbekannt“
-- Hersteller-Provider für Siemens und Shimano
-- sichtbare technische Diagnose
-- Siemens-Testfoto und Unit-Tests
-- PWA für Android und iPhone
+Enthaltene Herstellerprofile: Siemens, Shimano, Pfeiffer Vacuum, HEIDENHAIN, Phoenix Contact, Schneider Electric/Telemecanique, Gossen Metrawatt und Siebert. Unbekannte Hersteller werden generisch recherchiert.
 
-## Render Deployment
+## Stabilität
 
-1. Projekt nach GitHub hochladen.
-2. In Render als Blueprint importieren oder vorhandenen Dienst verbinden.
-3. `OPENAI_API_KEY` setzen.
-4. **Manual Deploy → Clear build cache & deploy**.
+- Bildanalyse und Webrecherche bleiben getrennt.
+- Die Textsuche benötigt kein Foto.
+- HTML statt JSON wird als `API_RETURNED_NON_JSON` verständlich gemeldet.
+- Keine inkompatible Kombination aus `reasoning.effort` und Websuche.
+- Testmanifeste für Bild- und Textfälle liegen unter `server/evals/`.
 
-Build Command:
+## Render
 
-```text
-npm run build
-```
+- Build Command: `npm run build`
+- Start Command: `npm start`
+- Root Directory: leer
+- Umgebungsvariable: `OPENAI_API_KEY`
+- Optional: `OPENAI_VISION_MODEL=gpt-4.1-mini`
+- Optional: `OPENAI_RESEARCH_MODEL=gpt-5-mini`
 
-Start Command:
+Nach dem Upload **Manual Deploy → Clear build cache & deploy** ausführen.
 
-```text
-npm start
-```
-
-Health Check:
-
-```text
-https://DEINE-URL.onrender.com/api/health
-```
-
-Erwartet wird `version: "2.0"` und `architecture: "split-pipeline"`.
-
-## Bekannter Siemens-Testfall
-
-Das Testbild liegt unter `server/tests/fixtures/siemens-label.jpg`.
-
-Erwartete Angaben:
-
-- Hersteller: Siemens
-- Produktfamilie: SIMATIC S7-300
-- Bestellnummer: 6ES7 318-3FL01-0AB0
-
-## Lokale Entwicklung
-
-```bash
-npm run install:all
-cp server/.env.example server/.env
-npm run build
-npm start
-```
-
-Tests:
-
-```bash
-npm test
-```
-
-## Kostenlogik
-
-Die Websuche startet erst nach der Bestätigung. Bildrotation, Zuschneiden, Vorschau und Fortschrittsanzeige laufen lokal und verursachen keine API-Tokens. Der automatische zweite Bildleseversuch erfolgt nur, wenn der erste keine verwertbaren Angaben liefert.
+Health-Check: `/api/health` muss `version: "3.0"` und `architecture: "split-vision-and-staged-research"` anzeigen.
