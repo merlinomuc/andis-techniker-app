@@ -1,97 +1,59 @@
-# Andis Techniker-App – Version 1.6
+# Andis Techniker-App v1.7
 
-Mobile-first PWA zur Identifikation technischer Geräte, Bauteile, Typenschilder, Verpackungsetiketten, Displays sowie QR- und Barcodes.
+Stabilitäts-Release für die visuelle Erkennung von technischen Geräten, Typenschildern, Verpackungsetiketten und Displays.
 
-## Neu in Version 1.6
+## Wichtigste Änderungen
 
-- eigener Bildfokus: **Automatisch**, **Gerät**, **Etikett / Typenschild** oder **Display / Fehlercode**
-- Verpackungskartons und Produktetiketten gelten ausdrücklich als Identifikationsziel
-- Bildtyp wird im Ergebnis sichtbar ausgewiesen
-- Hersteller, Modell-, Bestell-, Typ- und Seriennummern werden separat dargestellt
-- Vertrauensstufe für jede gelesene Kennzeichnung
-- Etiketten- und Displaymodus senden Bilder mit hoher Detailstufe
-- Bilder werden mit bis zu 2.400 Pixeln und höherer JPEG-Qualität vorbereitet
-- gedrehte oder schräge Beschriftungen werden im Analyseauftrag ausdrücklich berücksichtigt
-- Klartext neben Barcodes wird gegenüber einem erratenen Barcode-Inhalt priorisiert
-- Recherche startet bevorzugt mit exakter Hersteller- und Bestellnummer
-- weiterhin nur ein KI-Analyseaufruf pro Vorgang
+- Eigenes Vision-Modell (`gpt-4.1-mini`) für Bild- und Texterkennung.
+- Recherche weiterhin mit `gpt-5-mini`.
+- Höheres Ausgabelimit für die strukturierte Bildanalyse.
+- Unvollständige oder leere API-Antworten werden als technischer Fehler angezeigt und nicht mehr fälschlich als „Unbekannt“.
+- API-Status, verwendetes Vision-Modell und Tokenverbrauch stehen in den Diagnoseinformationen.
+- Fotos können vor der Analyse um 90 Grad nach links oder rechts gedreht werden.
+- Automatischer zweiter Leseversuch bleibt erhalten und wird nur bei leerer Erkennung verwendet.
+- „Neue Suche“ und „Weiteres Foto ergänzen“ bleiben enthalten.
 
-Ein Foto eines Siemens-Verpackungsetiketts sollte nun beispielsweise als **Verpackungsetikett** klassifiziert und anhand einer sichtbaren Bestellnummer wie `6ES7 ...` identifiziert werden, auch wenn das Gerät selbst nicht auf dem Foto zu sehen ist.
+## Render
 
-## Weitere Funktionen
-
-- Foto direkt mit der Handykamera aufnehmen
-- ein oder mehrere Bilder aus der Galerie auswählen
-- bis zu vier Ansichten gemeinsam analysieren
-- QR- und Barcode mit der Kamera scannen
-- Hersteller, Typ, Artikelnummer oder Fehlercode manuell eingeben
-- Identifikation, Fehlersuche, Dokumentensuche und Ersatzteilsuche
-- Quellenlinks und Sicherheitshinweise
-- lokale Historie
-- als PWA auf Android und iPhone zum Home-Bildschirm hinzufügen
-
-## Render-Deployment
-
-1. Inhalt dieses Ordners in das GitHub-Repository übernehmen.
-2. Änderungen committen und pushen.
-3. In Render folgende Befehle verwenden:
+Build Command:
 
 ```text
-Build Command: npm run build
-Start Command: npm start
+npm run build
 ```
 
-4. `OPENAI_API_KEY` als geheime Umgebungsvariable setzen.
-5. Danach **Manual Deploy → Clear build cache & deploy** ausführen.
+Start Command:
 
-Die mitgelieferte `render.yaml` enthält diese Konfiguration bereits.
-
-## Lokal starten
-
-```bash
-npm run install:all
-cp server/.env.example server/.env
-# OPENAI_API_KEY in server/.env eintragen
-npm run dev --prefix server
-npm run dev --prefix client
+```text
+npm start
 ```
 
-Frontend: `http://localhost:5173`  
-Backend: `http://localhost:3001`
+Erforderliche Umgebungsvariable:
 
-## Empfohlene Aufnahme
+```text
+OPENAI_API_KEY=...
+```
 
-Für kleine Typenschilder oder Verpackungslabels den Modus **Etikett / Typenschild** wählen. Das Schild möglichst groß, gerade und ohne Spiegelung fotografieren. Ein zweites Gesamtfoto kann zusätzlich hochgeladen werden.
+Voreinstellungen aus `render.yaml`:
 
-## Sicherheit
+```text
+OPENAI_MODEL=gpt-5-mini
+OPENAI_VISION_MODEL=gpt-4.1-mini
+```
 
-Der OpenAI-API-Schlüssel liegt ausschließlich im Backend. KI-Angaben müssen mit offiziellen Herstellerunterlagen und betrieblichen Vorgaben abgeglichen werden.
+Nach dem Upload zu GitHub in Render **Manual Deploy → Clear build cache & deploy** ausführen.
 
+Health-Check:
 
-## Neu in Version 1.6
+```text
+/api/health
+```
 
-- echte zweistufige Analyse: zuerst reine Bilderkennung, danach Recherche
-- Websuche kann die visuelle Texterkennung nicht mehr überlagern
-- erkannter Rohtext kann zur Kontrolle aufgeklappt werden
-- sichtbarer Button **Neue Suche** nach jedem Ergebnis
-- Button **Weiteres Foto ergänzen**
-- speziell robuster für Verpackungsetiketten und seitlich fotografierte Typenschilder
+Erwartete Version: `1.7`.
 
+## Empfohlener Test mit seitlichem Etikett
 
-## Neu in Version 1.6
-
-- Structured Outputs mit strengem JSON-Schema für die visuelle Erkennung
-- Fallback-Auswertung, falls eine Modellantwort trotzdem kein gültiges JSON ist
-- automatischer zweiter Leseversuch bei leerer Erkennung; nur dann entsteht ein zusätzlicher API-Aufruf
-- zweiter Versuch behandelt das Bild gezielt als Dokument oder Verpackungsetikett und nutzt hohe Bilddetails
-- Diagnosebereich mit Parse-Status, Retry-Status, Pipeline und technischer Rohantwort
-- erkannte Siemens- und weitere typische Industrienummern werden im Fallback aus Freitext gerettet
-- `Neue Suche` bleibt direkt im Ergebnis verfügbar
-
-### Testfall Siemens-Verpackung
-
-Beim mitgelieferten Analyseablauf wird ein seitlich aufgenommenes Verpackungsetikett gezielt nach Hersteller, Produktfamilie und Bestellnummer untersucht. Erwartete sichtbare Angaben des Testfotos sind unter anderem `SIEMENS`, `SIMATIC S7-300` und `6ES7 318-3FL01-0AB0`.
-
-### Diagnose
-
-Nach einer Analyse kann der Bereich **Diagnoseinformationen** geöffnet werden. `Auswertung: json` bedeutet, dass das Structured Output korrekt verarbeitet wurde. `Zweiter Leseversuch: Ja` bedeutet, dass der erste Versuch leer war und automatisch ein engerer, hochauflösender Leseversuch ausgeführt wurde.
+1. Foto aus Galerie auswählen.
+2. Fokus **Etikett / Typenschild** wählen.
+3. Das Foto mit dem Drehknopf so ausrichten, dass die Beschriftung waagerecht steht.
+4. Analyse starten.
+5. Falls ein Fehler erscheint, Diagnoseinformationen öffnen. Eine leere oder unvollständige Modellantwort wird jetzt ausdrücklich als technischer Fehler gemeldet.

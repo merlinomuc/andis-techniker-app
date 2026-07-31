@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { BrowserMultiFormatReader } from '@zxing/browser';
 import { marked } from 'marked';
-import { Camera, Images, ScanLine, Search, Wrench, FileText, RefreshCw, ShieldAlert, X, History, Trash2, Check, LoaderCircle, CircleAlert, ImagePlus, Cpu, Gauge, ChevronRight, Tags, PackageSearch, MonitorDot } from 'lucide-react';
+import { Camera, Images, ScanLine, Search, Wrench, FileText, RefreshCw, ShieldAlert, X, History, Trash2, Check, LoaderCircle, CircleAlert, ImagePlus, Cpu, Gauge, ChevronRight, Tags, PackageSearch, MonitorDot, RotateCcw, RotateCw } from 'lucide-react';
 
 const modes = [
   ['identify', 'Identifizieren', Search], ['troubleshoot', 'Fehler suchen', Wrench],
@@ -47,6 +47,24 @@ function App() {
     return canvas.toDataURL('image/jpeg', .9);
   }
 
+  async function rotateImage(index, degrees) {
+    try {
+      const src = images[index];
+      const img = await new Promise((resolve, reject) => { const i = new Image(); i.onload = () => resolve(i); i.onerror = reject; i.src = src; });
+      const quarterTurn = Math.abs(degrees) % 180 === 90;
+      const canvas = document.createElement('canvas');
+      canvas.width = quarterTurn ? img.height : img.width;
+      canvas.height = quarterTurn ? img.width : img.height;
+      const ctx = canvas.getContext('2d');
+      ctx.translate(canvas.width / 2, canvas.height / 2);
+      ctx.rotate(degrees * Math.PI / 180);
+      ctx.drawImage(img, -img.width / 2, -img.height / 2);
+      const rotated = canvas.toDataURL('image/jpeg', .92);
+      setImages(prev => prev.map((value, i) => i === index ? rotated : value));
+      setResult(null); setError('');
+    } catch { setError('Das Bild konnte nicht gedreht werden.'); }
+  }
+
   async function addImages(fileList) {
     try {
       const remaining = MAX_IMAGES - images.length;
@@ -89,7 +107,7 @@ function App() {
   function clearHistory() { setHistory([]); localStorage.removeItem('andi-history'); }
 
   return <>
-    <header><div className="brand"><div className="logo"><Wrench /></div><div><h1>ANDIS</h1><p>TECHNIKER-APP</p></div></div><span className="version">V1.6</span></header>
+    <header><div className="brand"><div className="logo"><Wrench /></div><div><h1>ANDIS</h1><p>TECHNIKER-APP</p></div></div><span className="version">V1.7</span></header>
     <main>
       <section className="hero card tech-grid">
         <div className="system-line"><Cpu size={15}/> TECHNISCHER ASSISTENT <span>ONLINE</span></div>
@@ -111,7 +129,7 @@ function App() {
         <input ref={cameraRef} hidden type="file" accept="image/*" capture="environment" onChange={e=>{addImages(e.target.files); e.target.value='';}}/>
         <input ref={galleryRef} hidden type="file" accept="image/*" multiple onChange={e=>{addImages(e.target.files); e.target.value='';}}/>
 
-        {images.length > 0 && <div className="image-panel"><div className="image-panel-head"><strong>{images.length} von {MAX_IMAGES} Bildern</strong><span>Gesamtansicht · Typenschild · Rückseite</span></div><div className="previews">{images.map((src,i)=><div className="preview" key={i}><img src={src} alt={`Technisches Detail ${i+1}`}/><span>{i+1}</span><button aria-label="Bild entfernen" onClick={()=>setImages(v=>v.filter((_,n)=>n!==i))}><X size={17}/></button></div>)}{images.length<MAX_IMAGES&&<button className="add-more" onClick={()=>galleryRef.current?.click()}><ImagePlus/><span>Weiteres Bild</span></button>}</div></div>}
+        {images.length > 0 && <div className="image-panel"><div className="image-panel-head"><strong>{images.length} von {MAX_IMAGES} Bildern</strong><span>Gesamtansicht · Typenschild · Rückseite</span></div><div className="previews">{images.map((src,i)=><div className="preview" key={i}><img src={src} alt={`Technisches Detail ${i+1}`}/><span>{i+1}</span><button className="remove-image" aria-label="Bild entfernen" onClick={()=>setImages(v=>v.filter((_,n)=>n!==i))}><X size={17}/></button><div className="rotate-actions"><button aria-label="Bild nach links drehen" onClick={()=>rotateImage(i,-90)}><RotateCcw size={15}/></button><button aria-label="Bild nach rechts drehen" onClick={()=>rotateImage(i,90)}><RotateCw size={15}/></button></div></div>)}{images.length<MAX_IMAGES&&<button className="add-more" onClick={()=>galleryRef.current?.click()}><ImagePlus/><span>Weiteres Bild</span></button>}</div></div>}
         {error && <div className="error"><CircleAlert size={18}/>{error}</div>}
         <button className="analyze" onClick={analyze} disabled={loading}>{loading ? <><span className="spinner"/> Analyse läuft …</> : <><Gauge size={20}/> Jetzt analysieren <ChevronRight size={20}/></>}</button>
         {(query||images.length||result)&&<button className="reset" onClick={reset}>Eingabe zurücksetzen</button>}
@@ -123,7 +141,7 @@ function App() {
       <section className="card result"><div className="result-head"><div><span className="eyebrow">ANALYSEERGEBNIS</span><h2>Technische Auswertung</h2></div><ShieldAlert size={28}/></div>
       {(result.imageType || result.extractedIdentifiers?.length>0) && <div className="label-readout"><div className="label-readout-head"><Tags size={18}/><div><span>ERKANNTER BILDTYP</span><strong>{result.imageType || 'Unbekannt'}</strong></div></div>{result.extractedIdentifiers?.length>0&&<div className="identifier-grid">{result.extractedIdentifiers.map((item,i)=><div className="identifier" key={`${item.label}-${i}`}><span>{item.label}</span><strong>{item.value}</strong><small className={`confidence ${item.confidence||'mittel'}`}>{item.confidence||'mittel'}</small></div>)}</div>}</div>}
       {result.rawText?.length>0&&<details className="recognition raw-text"><summary>Erkannten Rohtext anzeigen</summary><ul>{result.rawText.map((x,i)=><li key={i}>{x}</li>)}</ul></details>}
-      {result.diagnostics&&<details className="recognition diagnostics"><summary>Diagnoseinformationen</summary><div className="diagnostic-grid"><div><span>Auswertung</span><strong>{result.diagnostics.parseStatus||'unbekannt'}</strong></div><div><span>Zweiter Leseversuch</span><strong>{result.diagnostics.retryUsed?'Ja':'Nein'}</strong></div><div><span>Pipeline</span><strong>{result.pipeline||'unbekannt'}</strong></div></div>{result.diagnostics.parseError&&<p className="diagnostic-error">{result.diagnostics.parseError}</p>}<details className="raw-response"><summary>Technische Rohantwort anzeigen</summary><pre>{result.diagnostics.visionRawResponse||'(leer)'}</pre></details></details>}
+      {result.diagnostics&&<details className="recognition diagnostics"><summary>Diagnoseinformationen</summary><div className="diagnostic-grid"><div><span>Auswertung</span><strong>{result.diagnostics.parseStatus||'unbekannt'}</strong></div><div><span>Zweiter Leseversuch</span><strong>{result.diagnostics.retryUsed?'Ja':'Nein'}</strong></div><div><span>Pipeline</span><strong>{result.pipeline||'unbekannt'}</strong></div><div><span>API-Status</span><strong>{result.diagnostics.responseStatus?.status||'unbekannt'}</strong></div><div><span>Vision-Modell</span><strong>{result.diagnostics.visionModel||'unbekannt'}</strong></div><div><span>Bild-Tokens</span><strong>{result.diagnostics.responseStatus?.usage?.input_tokens ?? '–'}</strong></div></div>{result.diagnostics.parseError&&<p className="diagnostic-error">{result.diagnostics.parseError}</p>}<details className="raw-response"><summary>Technische Rohantwort anzeigen</summary><pre>{result.diagnostics.visionRawResponse||'(leer)'}</pre></details></details>}
       <div className="markdown" dangerouslySetInnerHTML={{__html:marked.parse(result.answer)}}/>{result.recognitionBasis?.length>0&&<details className="recognition"><summary>Warum dieses Ergebnis?</summary><ul>{result.recognitionBasis.map((x,i)=><li key={i}>{x}</li>)}</ul></details>}{result.sources?.length>0&&<div className="sources"><h3>Gefundene Quellen</h3>{result.sources.map((s,i)=><a key={s.url} href={s.url} target="_blank" rel="noreferrer"><span>{i+1}</span><div><strong>{s.title}</strong><small>{new URL(s.url).hostname}</small></div><ChevronRight size={17}/></a>)}</div>}<div className="result-actions"><button className="new-search" onClick={newSearch}><Search size={18}/> Neue Suche</button><button className="secondary-search" onClick={()=>{setResult(null);window.scrollTo({top:0,behavior:'smooth'});}}><ImagePlus size={18}/> Weiteres Foto ergänzen</button></div></section></>}
       <section className="safety card"><ShieldAlert/><div><strong>Sicher arbeiten</strong><p>KI-Angaben prüfen. Herstellerunterlagen und betriebliche Vorgaben haben Vorrang.</p></div></section>
       {history.length>0&&<section className="history card"><div className="history-head"><div><History size={20}/><h2>Letzte Analysen</h2></div><button onClick={clearHistory}><Trash2 size={17}/> Löschen</button></div>{history.map(item=><button className="history-item" key={item.id} onClick={()=>openHistory(item)}><strong>{item.query}</strong><span>{item.date}</span></button>)}</section>}

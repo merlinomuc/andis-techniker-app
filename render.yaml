@@ -12,3 +12,5 @@ services:
         sync: false
       - key: OPENAI_MODEL
         value: gpt-5-mini
+      - key: OPENAI_VISION_MODEL
+        value: gpt-4.1-mini

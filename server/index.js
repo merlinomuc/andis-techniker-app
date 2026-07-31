@@ -106,6 +106,46 @@ function parseVisionPayload(text) {
   return { vision: fallbackFromText(raw), parseStatus: 'fallback', parseError: 'Antwort war kein gültiges JSON' };
 }
 
+function responseStatusInfo(response) {
+  return {
+    status: response?.status || 'unknown',
+    incompleteReason: response?.incomplete_details?.reason || '',
+    outputTypes: Array.isArray(response?.output) ? response.output.map(item => item?.type || 'unknown') : [],
+    usage: response?.usage || null
+  };
+}
+
+function extractAnyResponseText(response) {
+  if (typeof response?.output_text === 'string' && response.output_text.trim()) return response.output_text.trim();
+  const parts = [];
+  for (const item of response?.output || []) {
+    if (item?.type !== 'message') continue;
+    for (const content of item.content || []) {
+      if (content?.type === 'output_text' && typeof content.text === 'string') parts.push(content.text);
+      if (content?.type === 'refusal' && typeof content.refusal === 'string') parts.push(content.refusal);
+    }
+  }
+  return parts.join('\n').trim();
+}
+
+function assertUsableResponse(response, stage) {
+  const info = responseStatusInfo(response);
+  const text = extractAnyResponseText(response);
+  if (info.status === 'incomplete' && !text) {
+    const error = new Error(`${stage} wurde unvollständig beendet${info.incompleteReason ? `: ${info.incompleteReason}` : '.'}`);
+    error.code = 'INCOMPLETE_MODEL_RESPONSE';
+    error.responseInfo = info;
+    throw error;
+  }
+  if (!text) {
+    const error = new Error(`${stage} lieferte keinen auswertbaren Text. Bitte erneut versuchen.`);
+    error.code = 'EMPTY_MODEL_RESPONSE';
+    error.responseInfo = info;
+    throw error;
+  }
+  return { text, info };
+}
+
 const visionSchema = {
   type: 'object', additionalProperties: false,
   properties: {
@@ -124,7 +164,7 @@ const visionSchema = {
   required: ['imageType', 'objectClass', 'rawText', 'extractedIdentifiers', 'imageAssessment', 'recognitionBasis']
 };
 
-app.get('/api/health', (_req, res) => res.json({ ok: true, configured: Boolean(process.env.OPENAI_API_KEY), version: '1.6' }));
+app.get('/api/health', (_req, res) => res.json({ ok: true, configured: Boolean(process.env.OPENAI_API_KEY), version: '1.7', visionModel: process.env.OPENAI_VISION_MODEL || 'gpt-4.1-mini', researchModel: process.env.OPENAI_MODEL || 'gpt-5-mini' }));
 
 app.post('/api/analyze', async (req, res) => {
   try {
@@ -132,7 +172,8 @@ app.post('/api/analyze', async (req, res) => {
     if (!process.env.OPENAI_API_KEY) return res.status(503).json({ error: 'OPENAI_API_KEY ist auf dem Server noch nicht eingerichtet.' });
 
     const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-    const model = process.env.OPENAI_MODEL || 'gpt-5-mini';
+    const researchModel = process.env.OPENAI_MODEL || 'gpt-5-mini';
+    const visionModel = process.env.OPENAI_VISION_MODEL || 'gpt-4.1-mini';
     const focusLabels = {
       auto: 'Automatisch entscheiden, ob Gerät, Bauteil, Typenschild, Verpackungsetikett oder Display zu sehen ist.',
       device: 'Das sichtbare Gerät oder Bauteil priorisieren und Beschriftungen vollständig lesen.',
@@ -151,11 +192,12 @@ app.post('/api/analyze', async (req, res) => {
 
     async function runVisionAttempt(extraInstruction = '') {
       return openai.responses.create({
-        model,
+        model: visionModel,
         instructions: `Du bist ein präziser technischer Bildleser. Keine Webrecherche und keine Produktdaten ergänzen. Lies sichtbaren Text exakt. ${extraInstruction}`,
         input: [{ role: 'user', content: visionContent }],
         text: { format: { type: 'json_schema', name: 'technical_image_readout', strict: true, schema: visionSchema } },
-        max_output_tokens: 900
+        max_output_tokens: 1800,
+        store: false
       });
     }
 
@@ -164,16 +206,21 @@ app.post('/api/analyze', async (req, res) => {
     let retryUsed = false;
     try {
       visionResponse = await runVisionAttempt();
-      parsed = parseVisionPayload(visionResponse.output_text || '');
+      const checked = assertUsableResponse(visionResponse, 'Die Bildanalyse');
+      parsed = parseVisionPayload(checked.text);
+      parsed.responseInfo = checked.info;
     } catch (structuredError) {
       // Kompatibilitäts-Fallback für ältere SDK-/Modellkonfigurationen.
       visionResponse = await openai.responses.create({
-        model,
+        model: visionModel,
         instructions: 'Antworte ausschließlich als gültiges JSON entsprechend dem im Nutzertext beschriebenen Schema. Keine Markdown-Codeblöcke.',
         input: [{ role: 'user', content: visionContent }],
-        max_output_tokens: 900
+        max_output_tokens: 1800,
+        store: false
       });
-      parsed = parseVisionPayload(visionResponse.output_text || '');
+      const checked = assertUsableResponse(visionResponse, 'Der kompatible Bildanalyse-Fallback');
+      parsed = parseVisionPayload(checked.text);
+      parsed.responseInfo = checked.info;
       parsed.parseError = `Structured Output nicht verfügbar: ${structuredError?.message || 'unbekannt'}. ${parsed.parseError || ''}`.trim();
     }
 
@@ -184,13 +231,16 @@ app.post('/api/analyze', async (req, res) => {
       const retryContent = [{ type: 'input_text', text: `Zweiter, besonders konservativer Leseversuch. Behandle das Bild zuerst als Dokument oder Verpackungsetikett. Suche den kleineren hellen Etikettenbereich im Gesamtbild, drehe ihn gedanklich und transkribiere besonders Siemens-/Industrie-Bestellnummern. Nutzereingabe: ${input.query || '(keine)'}` }];
       for (const image of input.images) retryContent.push({ type: 'input_image', image_url: image, detail: 'high' });
       const retryResponse = await openai.responses.create({
-        model,
+        model: visionModel,
         instructions: 'Lies nur sichtbar vorhandenen Text. Antworte ausschließlich im verlangten JSON-Schema. Nichts erraten.',
         input: [{ role: 'user', content: retryContent }],
         text: { format: { type: 'json_schema', name: 'technical_image_retry', strict: true, schema: visionSchema } },
-        max_output_tokens: 900
+        max_output_tokens: 1800,
+        store: false
       });
-      const retryParsed = parseVisionPayload(retryResponse.output_text || '');
+      const retryChecked = assertUsableResponse(retryResponse, 'Der zweite Bild-Leseversuch');
+      const retryParsed = parseVisionPayload(retryChecked.text);
+      retryParsed.responseInfo = retryChecked.info;
       if (retryParsed.vision.rawText.length || retryParsed.vision.extractedIdentifiers.length) {
         visionResponse = retryResponse;
         parsed = retryParsed;
@@ -216,11 +266,13 @@ app.post('/api/analyze', async (req, res) => {
         replacement: 'Vergleiche Originalteil, offiziellen Nachfolger und mögliche kompatible Ersatzprodukte.'
       };
       const research = await openai.responses.create({
-        model,
+        model: researchModel,
         tools: [{ type: 'web_search' }],
         instructions: `Du bist der Recherche-Assistent in Andis Techniker-App. Verwende ausschließlich die übermittelten, visuell gelesenen Angaben. Erfinde keine fehlenden Zeichen. Bevorzuge offizielle Herstellerquellen. Antworte als gut lesbares Markdown mit den Abschnitten ## Erkannt, ## Technische Einordnung, ## Dokumente und ## Nächste Schritte. Kennzeichne Unsicherheit deutlich.`,
         input: `${modeLabels[input.mode]}\n\nVisuell gelesene Angaben:\n${searchSeed}\n\nBildtyp: ${vision.imageType || 'Unbekannt'}\nObjektklasse: ${vision.objectClass || 'Unbekannt'}`,
-        max_output_tokens: 1100
+        max_output_tokens: 1400,
+        reasoning: { effort: 'minimal' },
+        store: false
       });
       answer = research.output_text || '';
       sources = extractSources(research);
@@ -248,7 +300,10 @@ app.post('/api/analyze', async (req, res) => {
         parseStatus: parsed.parseStatus,
         parseError: parsed.parseError || '',
         retryUsed,
-        visionRawResponse: String(visionResponse.output_text || '').slice(0, 6000)
+        visionRawResponse: extractAnyResponseText(visionResponse).slice(0, 6000),
+        responseStatus: responseStatusInfo(visionResponse),
+        visionModel,
+        researchModel
       }
     });
   } catch (error) {
@@ -261,4 +316,4 @@ app.post('/api/analyze', async (req, res) => {
 
 app.use(express.static(clientDist));
 app.use((_req, res) => res.sendFile(path.join(clientDist, 'index.html')));
-app.listen(port, () => console.log(`Andis Techniker-App v1.6 läuft auf Port ${port}`));
+app.listen(port, () => console.log(`Andis Techniker-App v1.7 läuft auf Port ${port}`));
