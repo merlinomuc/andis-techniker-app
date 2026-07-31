@@ -1,4 +1,20 @@
-import {CheckCircle2,Edit3,FileSearch,RotateCcw} from 'lucide-react';
-import UsageSummary from './UsageSummary.jsx';
-const fields=[['manufacturer','Hersteller'],['productFamily','Produktfamilie'],['partNumber','Bestellnummer / P/N'],['model','Modell'],['serialNumber','Seriennummer'],['errorCode','Fehlercode']];
-export default function RecognitionEditor({vision,values,setValues,onResearch,onBack,researching}){return <section className="card"><div className="section-head"><div><span className="eyebrow">SCHRITT 2 · PRÜFEN</span><h2>Erkannte Angaben bestätigen</h2></div><CheckCircle2/></div><div className="recognition-banner"><span>{vision.imageType}</span><b>{vision.objectClass||'Technisches Objekt'}</b><small>Vertrauen: {vision.confidence}</small></div><div className="field-grid">{fields.map(([key,label])=><label key={key}><span>{label}</span><input value={values[key]||''} onChange={e=>setValues(v=>({...v,[key]:e.target.value}))} placeholder="nicht erkannt"/></label>)}</div>{vision.rawText?.length>0&&<details><summary>Gelesenen Rohtext anzeigen</summary><pre>{vision.rawText.join('\n')}</pre></details>}<div className="assessment"><Edit3/><div><b>Bildbeurteilung</b><p>{vision.imageAssessment?.message}</p>{vision.imageAssessment?.nextPhoto&&<small>Nützliches Zusatzfoto: {vision.imageAssessment.nextPhoto}</small>}</div></div><div className="actions"><button className="secondary" onClick={onBack}><RotateCcw/> Bilder ändern</button><button className="primary" disabled={researching||!Object.values(values).some(Boolean)} onClick={onResearch}><FileSearch/>{researching?'Recherche läuft …':'Produkt recherchieren'}</button></div><UsageSummary vision={vision.debug}/><details className="debug"><summary>Technische Diagnose</summary><pre>{JSON.stringify(vision.debug,null,2)}</pre></details></section>}
+{
+  "name": "andis-techniker-app",
+  "version": "3.3.2",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=20 <23",
+    "npm": ">=9"
+  },
+  "scripts": {
+    "install:server": "npm install --prefix server --omit=dev",
+    "install:client": "npm install --prefix client --include=dev",
+    "install:all": "npm run install:server && npm run install:client",
+    "build:client": "npm run build --prefix client",
+    "build": "npm run install:all && npm run build:client",
+    "start": "npm start --prefix server",
+    "test": "npm test --prefix server",
+    "verify": "node --check server/index.js && node --test server/tests/*.test.js"
+  }
+}

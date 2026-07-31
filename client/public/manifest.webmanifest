@@ -1,1 +1,13 @@
-{"name":"Andis Techniker-App 3.2","short_name":"Andis Technik","start_url":"/","display":"standalone","background_color":"#06131c","theme_color":"#06131c","icons":[{"src":"/icon.svg","sizes":"any","type":"image/svg+xml"}]}
+{
+  "name": "Andis Techniker-App",
+  "short_name": "Andis Technik",
+  "description": "Technische Geräte per Typ, Foto, QR- oder Barcode erkennen und recherchieren.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#081015",
+  "theme_color": "#081015",
+  "icons": [
+    {"src": "/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable"}
+  ]
+}

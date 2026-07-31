@@ -3,12 +3,14 @@ services:
     name: andis-techniker-app
     runtime: node
     plan: free
+    rootDir: .
     buildCommand: npm run build
     startCommand: npm start
     healthCheckPath: /api/health
+    autoDeploy: true
     envVars:
       - key: NODE_VERSION
-        value: 22
+        value: 22.14.0
       - key: OPENAI_API_KEY
         sync: false
       - key: OPENAI_VISION_MODEL
