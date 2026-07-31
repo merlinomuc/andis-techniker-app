@@ -1,38 +1,35 @@
-# Andis Techniker-App 3.0
+# Andis Techniker-App 3.1 – Stability Release
 
-Version 3.0 verbindet zwei gleichwertige Einstiege:
+Version 3.1 stabilisiert die Bildanalyse und ist im Layout eindeutig als **V3.1 STABILITY** erkennbar.
 
-1. **Typ eingeben** – Hersteller, Modell, Bestellnummer oder Fehlercode direkt suchen.
-2. **Foto analysieren** – Bild lesen, erkannte Daten bestätigen und anschließend recherchieren.
+## Wichtigste Änderungen
 
-## Neue Recherchelogik
-
-Die Recherche läuft stufenweise von innen nach außen:
-
-1. Bekannten Hersteller aus Typ, Modell oder Bestellnummer ableiten.
-2. Offizielle Herstellerdomains mit exakter Nummer durchsuchen.
-3. Danach autorisierte Distributoren, technische Kataloge und weitere belastbare Internetquellen ergänzen.
-4. Offizielle und zusätzliche Quellen getrennt darstellen.
-
-Enthaltene Herstellerprofile: Siemens, Shimano, Pfeiffer Vacuum, HEIDENHAIN, Phoenix Contact, Schneider Electric/Telemecanique, Gossen Metrawatt und Siebert. Unbekannte Hersteller werden generisch recherchiert.
-
-## Stabilität
-
-- Bildanalyse und Webrecherche bleiben getrennt.
-- Die Textsuche benötigt kein Foto.
-- HTML statt JSON wird als `API_RETURNED_NON_JSON` verständlich gemeldet.
-- Keine inkompatible Kombination aus `reasoning.effort` und Websuche.
-- Testmanifeste für Bild- und Textfälle liegen unter `server/evals/`.
+- Kompakteres Structured-Output-Schema für die Bildlesung
+- Höheres Ausgabelimit: 2800 Tokens im ersten Versuch
+- Automatischer kompakter Retry mit 4000 Tokens bei `max_output_tokens`
+- Retry auch dann, wenn keine brauchbaren Identifikatoren gefunden wurden
+- Rohtext auf 16 relevante Zeilen begrenzt
+- Erkennungsmerkmale auf 4 Einträge begrenzt
+- Siemens-Muster um `6EP` erweitert
+- Sichtbarer 3.1-Stabilitätsbanner und neue Kopfzeile
+- Direkte Text-/Typensuche und herstellerzentrierte Recherche aus Version 3.0 bleiben erhalten
 
 ## Render
 
 - Build Command: `npm run build`
 - Start Command: `npm start`
-- Root Directory: leer
-- Umgebungsvariable: `OPENAI_API_KEY`
-- Optional: `OPENAI_VISION_MODEL=gpt-4.1-mini`
-- Optional: `OPENAI_RESEARCH_MODEL=gpt-5-mini`
+- Danach: **Manual Deploy → Clear build cache & deploy**
 
-Nach dem Upload **Manual Deploy → Clear build cache & deploy** ausführen.
+Health-Check:
 
-Health-Check: `/api/health` muss `version: "3.0"` und `architecture: "split-vision-and-staged-research"` anzeigen.
+`/api/health`
+
+Erwartet:
+
+```json
+{
+  "ok": true,
+  "version": "3.1",
+  "architecture": "split-vision-staged-research-with-retry"
+}
+```

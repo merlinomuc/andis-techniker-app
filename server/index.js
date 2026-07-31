@@ -3,8 +3,8 @@ import express from 'express'; import cors from 'cors'; import helmet from 'helm
 import visionRoutes from './routes/vision.js'; import researchRoutes from './routes/research.js'; import {errorPayload} from './utils/errors.js';
 const app=express(); const port=process.env.PORT||3001; const __dirname=path.dirname(fileURLToPath(import.meta.url)); const dist=path.resolve(__dirname,'../client/dist');
 app.use(helmet({contentSecurityPolicy:false})); app.use(cors()); app.use(express.json({limit:'30mb'}));
-app.get('/api/health',(_req,res)=>res.json({ok:true,configured:Boolean(process.env.OPENAI_API_KEY),version:'3.0',visionModel:process.env.OPENAI_VISION_MODEL||'gpt-4.1-mini',researchModel:process.env.OPENAI_RESEARCH_MODEL||'gpt-5-mini',architecture:'split-vision-and-staged-research'}));
+app.get('/api/health',(_req,res)=>res.json({ok:true,configured:Boolean(process.env.OPENAI_API_KEY),version:'3.1',visionModel:process.env.OPENAI_VISION_MODEL||'gpt-4.1-mini',researchModel:process.env.OPENAI_RESEARCH_MODEL||'gpt-5-mini',architecture:'split-vision-staged-research-with-retry'}));
 app.use('/api/vision',visionRoutes); app.use('/api/research',researchRoutes);
 app.use(express.static(dist)); app.use((_req,res,next)=>{ if (_req.path.startsWith('/api/')) return next(); res.sendFile(path.join(dist,'index.html')); });
 app.use((err,_req,res,_next)=>{console.error(err); if(err instanceof ZodError) return res.status(400).json({error:err.issues[0]?.message||'Ungültige Eingabe',code:'VALIDATION_ERROR'}); const status=Number.isInteger(err.status)?err.status:500; res.status(status).json(errorPayload(err));});
-app.listen(port,()=>console.log(`Andis Techniker-App v3.0 auf Port ${port}`));
+app.listen(port,()=>console.log(`Andis Techniker-App v3.1 auf Port ${port}`));
