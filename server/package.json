@@ -1,6 +1,6 @@
 {
   "name": "andis-techniker-app-server",
-  "version": "0.1.0",
+  "version": "1.4.0",
   "type": "module",
   "scripts": {
     "dev": "node --watch index.js",

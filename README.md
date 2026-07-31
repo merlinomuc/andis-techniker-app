@@ -1,71 +1,68 @@
-# Andis Techniker-App – Version 1.2
+# Andis Techniker-App – Version 1.4
 
-Mobile-first PWA zur Identifikation technischer Bauteile per Foto, QR-/Barcode oder Texteingabe.
+Mobile-first PWA zur Identifikation technischer Geräte, Bauteile, Typenschilder, Verpackungsetiketten, Displays sowie QR- und Barcodes.
 
-## Funktionen der ersten Version
+## Neu in Version 1.4
 
-- Foto aufnehmen oder aus der Galerie wählen
-- QR- und Barcode mit der Handykamera scannen
-- Hersteller/Typ/Artikelnummer manuell eingeben
-- KI-Analyse mit technischer Zusammenfassung
-- Websuche nach Datenblättern, Handbüchern und Herstellerinformationen
+- eigener Bildfokus: **Automatisch**, **Gerät**, **Etikett / Typenschild** oder **Display / Fehlercode**
+- Verpackungskartons und Produktetiketten gelten ausdrücklich als Identifikationsziel
+- Bildtyp wird im Ergebnis sichtbar ausgewiesen
+- Hersteller, Modell-, Bestell-, Typ- und Seriennummern werden separat dargestellt
+- Vertrauensstufe für jede gelesene Kennzeichnung
+- Etiketten- und Displaymodus senden Bilder mit hoher Detailstufe
+- Bilder werden mit bis zu 2.400 Pixeln und höherer JPEG-Qualität vorbereitet
+- gedrehte oder schräge Beschriftungen werden im Analyseauftrag ausdrücklich berücksichtigt
+- Klartext neben Barcodes wird gegenüber einem erratenen Barcode-Inhalt priorisiert
+- Recherche startet bevorzugt mit exakter Hersteller- und Bestellnummer
+- weiterhin nur ein KI-Analyseaufruf pro Vorgang
+
+Ein Foto eines Siemens-Verpackungsetiketts sollte nun beispielsweise als **Verpackungsetikett** klassifiziert und anhand einer sichtbaren Bestellnummer wie `6ES7 ...` identifiziert werden, auch wenn das Gerät selbst nicht auf dem Foto zu sehen ist.
+
+## Weitere Funktionen
+
+- Foto direkt mit der Handykamera aufnehmen
+- ein oder mehrere Bilder aus der Galerie auswählen
+- bis zu vier Ansichten gemeinsam analysieren
+- QR- und Barcode mit der Kamera scannen
+- Hersteller, Typ, Artikelnummer oder Fehlercode manuell eingeben
+- Identifikation, Fehlersuche, Dokumentensuche und Ersatzteilsuche
 - Quellenlinks und Sicherheitshinweise
-- Letzte Analysen lokal auf dem Gerät speichern
-- Als PWA auf Android/iPhone zum Home-Bildschirm hinzufügen
+- lokale Historie
+- als PWA auf Android und iPhone zum Home-Bildschirm hinzufügen
+
+## Render-Deployment
+
+1. Inhalt dieses Ordners in das GitHub-Repository übernehmen.
+2. Änderungen committen und pushen.
+3. In Render folgende Befehle verwenden:
+
+```text
+Build Command: npm run build
+Start Command: npm start
+```
+
+4. `OPENAI_API_KEY` als geheime Umgebungsvariable setzen.
+5. Danach **Manual Deploy → Clear build cache & deploy** ausführen.
+
+Die mitgelieferte `render.yaml` enthält diese Konfiguration bereits.
 
 ## Lokal starten
 
 ```bash
-npm install
 npm run install:all
 cp server/.env.example server/.env
 # OPENAI_API_KEY in server/.env eintragen
-# Terminal 1
 npm run dev --prefix server
-
-# Terminal 2
 npm run dev --prefix client
 ```
 
-Frontend: http://localhost:5173  
-Backend: http://localhost:3001
+Frontend: `http://localhost:5173`  
+Backend: `http://localhost:3001`
 
-## Auf Render bereitstellen
+## Empfohlene Aufnahme
 
-1. Repository zu GitHub hochladen.
-2. In Render **New > Blueprint** wählen.
-3. GitHub-Repository verbinden.
-4. Umgebungsvariable `OPENAI_API_KEY` setzen.
-5. Deployment starten.
-
-Alternativ einen Web Service erstellen:
-
-- Build Command: `npm install && npm run install:all && npm run build`
-- Start Command: `npm start`
+Für kleine Typenschilder oder Verpackungslabels den Modus **Etikett / Typenschild** wählen. Das Schild möglichst groß, gerade und ohne Spiegelung fotografieren. Ein zweites Gesamtfoto kann zusätzlich hochgeladen werden.
 
 ## Sicherheit
 
-Der OpenAI API-Key liegt ausschließlich im Render-Backend und niemals im Browser. Technische KI-Antworten sind Hinweise, kein Ersatz für Herstellerunterlagen, Freischaltverfahren oder Elektrofachkräfte.
-
-## Render-Fehler `vite: not found`
-
-Diese Version installiert die Abhängigkeiten von `server` und `client` ausdrücklich vor dem Build. In Render muss als Build-Befehl `npm run build` und als Start-Befehl `npm start` verwendet werden. Falls Render noch einen alten Build-Befehl gespeichert hat, im Render-Dashboard unter **Settings → Build & Deploy** aktualisieren und anschließend **Clear build cache & deploy** ausführen.
-
-
-## Neu in Version 1.2
-
-- leichte Fortschrittsanzeige ohne zusätzliche API-Aufrufe
-- Bildqualitätsprüfung mit konkretem Hinweis für ein besseres Foto
-- stufenweise Erkennung von Objektklasse, Logo, Serie und Modellnummer
-- mögliche Kandidaten statt komplettem Abbruch bei Unsicherheit
-- aufklappbare Erklärung „Warum dieses Ergebnis?“
-- Bilddetail `auto` und kürzere Maximalantwort zur Reduzierung des Verbrauchs
-
-## Version 1.3
-
-- getrennte Schaltflächen für Kamera und Galerie
-- Auswahl von bis zu vier Bildern
-- Kombination aus Gesamtansicht, Typenschild und Rückseite
-- lokale Bildverkleinerung vor dem Upload
-- technische, dunkle Benutzeroberfläche
-- weiterhin nur ein Analyseaufruf pro Vorgang
+Der OpenAI-API-Schlüssel liegt ausschließlich im Backend. KI-Angaben müssen mit offiziellen Herstellerunterlagen und betrieblichen Vorgaben abgeglichen werden.
