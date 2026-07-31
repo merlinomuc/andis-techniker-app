@@ -1,13 +1,21 @@
 import { useEffect, useRef, useState } from 'react';
 import { BrowserMultiFormatReader } from '@zxing/browser';
 import { marked } from 'marked';
-import { Camera, ScanLine, Search, Wrench, FileText, RefreshCw, ShieldAlert, X, History, Trash2 } from 'lucide-react';
+import { Camera, ScanLine, Search, Wrench, FileText, RefreshCw, ShieldAlert, X, History, Trash2, Check, LoaderCircle, CircleAlert, ImagePlus } from 'lucide-react';
 
 const modes = [
   ['identify', 'Identifizieren', Search],
   ['troubleshoot', 'Fehler suchen', Wrench],
   ['documents', 'Dokumente', FileText],
   ['replacement', 'Ersatzteil', RefreshCw]
+];
+
+const progressSteps = [
+  ['upload', 'Bild und Angaben werden übermittelt'],
+  ['quality', 'Bildqualität und sichtbare Details werden geprüft'],
+  ['object', 'Objektart, Logos und Beschriftungen werden erkannt'],
+  ['model', 'Hersteller und mögliches Modell werden eingegrenzt'],
+  ['sources', 'Passende technische Quellen werden gesucht']
 ];
 
 function App() {
@@ -17,13 +25,18 @@ function App() {
   const [preview, setPreview] = useState('');
   const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [progressIndex, setProgressIndex] = useState(0);
   const [error, setError] = useState('');
   const [scannerOpen, setScannerOpen] = useState(false);
   const [history, setHistory] = useState(() => JSON.parse(localStorage.getItem('andi-history') || '[]'));
   const videoRef = useRef(null);
   const controlsRef = useRef(null);
+  const progressTimerRef = useRef(null);
 
-  useEffect(() => () => controlsRef.current?.stop(), []);
+  useEffect(() => () => {
+    controlsRef.current?.stop();
+    clearInterval(progressTimerRef.current);
+  }, []);
 
   async function fileToDataUrl(file) {
     if (file.size > 9 * 1024 * 1024) throw new Error('Das Bild ist größer als 9 MB. Bitte kleiner aufnehmen.');
@@ -39,7 +52,7 @@ function App() {
     if (!file) return;
     try {
       const dataUrl = await fileToDataUrl(file);
-      setImage(dataUrl); setPreview(dataUrl); setError('');
+      setImage(dataUrl); setPreview(dataUrl); setError(''); setResult(null);
     } catch (e) { setError(e.message); }
   }
 
@@ -64,9 +77,18 @@ function App() {
 
   function closeScanner() { controlsRef.current?.stop(); setScannerOpen(false); }
 
+  function startProgress(hasImage) {
+    setProgressIndex(0);
+    clearInterval(progressTimerRef.current);
+    const lastAnimatedStep = hasImage ? progressSteps.length - 1 : 3;
+    progressTimerRef.current = setInterval(() => {
+      setProgressIndex(current => current < lastAnimatedStep ? current + 1 : current);
+    }, 1250);
+  }
+
   async function analyze() {
     if (!query.trim() && !image) return setError('Bitte Foto, Code oder Bezeichnung hinzufügen.');
-    setLoading(true); setError(''); setResult(null);
+    setLoading(true); setError(''); setResult(null); startProgress(Boolean(image));
     try {
       const response = await fetch('/api/analyze', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -74,12 +96,16 @@ function App() {
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || 'Analyse fehlgeschlagen.');
+      setProgressIndex(progressSteps.length);
       setResult(data);
-      const entry = { id: Date.now(), query: query || 'Fotoanalyse', mode, answer: data.answer, sources: data.sources, date: new Date().toLocaleString('de-DE') };
+      const entry = { id: Date.now(), query: query || 'Fotoanalyse', mode, ...data, date: new Date().toLocaleString('de-DE') };
       const next = [entry, ...history].slice(0, 8);
       setHistory(next); localStorage.setItem('andi-history', JSON.stringify(next));
     } catch (e) { setError(e.message); }
-    finally { setLoading(false); }
+    finally {
+      clearInterval(progressTimerRef.current);
+      setLoading(false);
+    }
   }
 
   function reset() { setQuery(''); setImage(null); setPreview(''); setResult(null); setError(''); }
@@ -90,13 +116,12 @@ function App() {
     <header><div className="brand"><div className="logo"><Wrench /></div><div><h1>Andis Techniker-App</h1><p>Erkennen · Verstehen · Reparieren</p></div></div></header>
     <main>
       <section className="hero card">
-        <span className="eyebrow">Technischer Assistent</span>
+        <span className="eyebrow">Technischer Assistent · Version 1.2</span>
         <h2>Was möchtest du untersuchen?</h2>
-        <p>Fotografiere Typenschild oder Bauteil, scanne einen Code oder gib Hersteller und Typ ein.</p>
+        <p>Fotografiere das ganze Bauteil und möglichst auch Logo, Typenschild oder Modellnummer.</p>
 
         <div className="modes">{modes.map(([key, label, Icon]) => <button key={key} className={mode === key ? 'active' : ''} onClick={() => setMode(key)}><Icon size={19}/><span>{label}</span></button>)}</div>
-
-        <label className="text-input"><Search size={20}/><input value={query} onChange={e => setQuery(e.target.value)} placeholder="z. B. Siemens 6ES7..., Fehler E17 oder Barcode" /></label>
+        <label className="text-input"><Search size={20}/><input value={query} onChange={e => setQuery(e.target.value)} placeholder="z. B. Shimano Deore LX, Siemens 6ES7… oder Fehler E17" /></label>
 
         <div className="capture-grid">
           <label className="capture-button"><Camera/><strong>Foto aufnehmen</strong><span>Kamera oder Galerie</span><input type="file" accept="image/*" capture="environment" onChange={e => chooseImage(e.target.files?.[0])}/></label>
@@ -109,13 +134,32 @@ function App() {
         {(query || image || result) && <button className="reset" onClick={reset}>Eingabe zurücksetzen</button>}
       </section>
 
-      {loading && <section className="card status"><div className="pulse"/><div><strong>Bauteil wird ausgewertet</strong><p>Bildmerkmale, Bezeichnungen und passende Quellen werden geprüft.</p></div></section>}
-
-      {result && <section className="card result">
-        <div className="result-head"><div><span className="eyebrow">Analyseergebnis</span><h2>Technische Auswertung</h2></div><ShieldAlert size={28}/></div>
-        <div className="markdown" dangerouslySetInnerHTML={{ __html: marked.parse(result.answer) }}/>
-        {result.sources?.length > 0 && <div className="sources"><h3>Gefundene Quellen</h3>{result.sources.map((s, i) => <a key={s.url} href={s.url} target="_blank" rel="noreferrer"><span>{i + 1}</span><div><strong>{s.title}</strong><small>{new URL(s.url).hostname}</small></div></a>)}</div>}
+      {loading && <section className="card progress-card">
+        <div className="progress-title"><LoaderCircle className="rotating"/><div><strong>Analyse läuft</strong><p>Diese Anzeige verursacht keine zusätzlichen KI-Anfragen.</p></div></div>
+        <div className="progress-list">{progressSteps.map(([key, label], index) => {
+          const done = index < progressIndex;
+          const active = index === progressIndex;
+          return <div className={`progress-row ${done ? 'done' : ''} ${active ? 'active' : ''}`} key={key}>
+            <span className="progress-icon">{done ? <Check size={15}/> : active ? <LoaderCircle size={15} className="rotating"/> : <span/>}</span>
+            <span>{label}</span>
+          </div>;
+        })}</div>
       </section>}
+
+      {result && <>
+        {result.imageAssessment && <section className={`card assessment ${result.imageAssessment.usable ? 'good' : 'warning'}`}>
+          {result.imageAssessment.usable ? <Check/> : <CircleAlert/>}
+          <div><strong>{result.imageAssessment.usable ? 'Bild ist auswertbar' : 'Bild reicht nicht für eine sichere Erkennung'}</strong><p>{result.imageAssessment.message}</p>
+          {result.imageAssessment.nextPhoto && <p className="next-photo"><ImagePlus size={16}/><b>Nächstes Foto:</b> {result.imageAssessment.nextPhoto}</p>}</div>
+        </section>}
+
+        <section className="card result">
+          <div className="result-head"><div><span className="eyebrow">Analyseergebnis</span><h2>Technische Auswertung</h2></div><ShieldAlert size={28}/></div>
+          <div className="markdown" dangerouslySetInnerHTML={{ __html: marked.parse(result.answer) }}/>
+          {result.recognitionBasis?.length > 0 && <details className="recognition"><summary>Warum dieses Ergebnis?</summary><ul>{result.recognitionBasis.map((item, i) => <li key={i}>{item}</li>)}</ul></details>}
+          {result.sources?.length > 0 && <div className="sources"><h3>Gefundene Quellen</h3>{result.sources.map((s, i) => <a key={s.url} href={s.url} target="_blank" rel="noreferrer"><span>{i + 1}</span><div><strong>{s.title}</strong><small>{new URL(s.url).hostname}</small></div></a>)}</div>}
+        </section>
+      </>}
 
       <section className="safety card"><ShieldAlert/><div><strong>Sicher arbeiten</strong><p>KI-Angaben prüfen. Herstellerunterlagen, Freischaltregeln und betriebliche Vorgaben haben Vorrang.</p></div></section>
 

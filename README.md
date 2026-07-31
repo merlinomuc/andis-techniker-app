@@ -1,4 +1,4 @@
-# Andis Techniker-App
+# Andis Techniker-App – Version 1.2
 
 Mobile-first PWA zur Identifikation technischer Bauteile per Foto, QR-/Barcode oder Texteingabe.
 
@@ -50,3 +50,13 @@ Der OpenAI API-Key liegt ausschließlich im Render-Backend und niemals im Browse
 ## Render-Fehler `vite: not found`
 
 Diese Version installiert die Abhängigkeiten von `server` und `client` ausdrücklich vor dem Build. In Render muss als Build-Befehl `npm run build` und als Start-Befehl `npm start` verwendet werden. Falls Render noch einen alten Build-Befehl gespeichert hat, im Render-Dashboard unter **Settings → Build & Deploy** aktualisieren und anschließend **Clear build cache & deploy** ausführen.
+
+
+## Neu in Version 1.2
+
+- leichte Fortschrittsanzeige ohne zusätzliche API-Aufrufe
+- Bildqualitätsprüfung mit konkretem Hinweis für ein besseres Foto
+- stufenweise Erkennung von Objektklasse, Logo, Serie und Modellnummer
+- mögliche Kandidaten statt komplettem Abbruch bei Unsicherheit
+- aufklappbare Erklärung „Warum dieses Ergebnis?“
+- Bilddetail `auto` und kürzere Maximalantwort zur Reduzierung des Verbrauchs
