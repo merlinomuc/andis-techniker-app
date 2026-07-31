@@ -46,3 +46,7 @@ Alternativ einen Web Service erstellen:
 ## Sicherheit
 
 Der OpenAI API-Key liegt ausschließlich im Render-Backend und niemals im Browser. Technische KI-Antworten sind Hinweise, kein Ersatz für Herstellerunterlagen, Freischaltverfahren oder Elektrofachkräfte.
+
+## Render-Fehler `vite: not found`
+
+Diese Version installiert die Abhängigkeiten von `server` und `client` ausdrücklich vor dem Build. In Render muss als Build-Befehl `npm run build` und als Start-Befehl `npm start` verwendet werden. Falls Render noch einen alten Build-Befehl gespeichert hat, im Render-Dashboard unter **Settings → Build & Deploy** aktualisieren und anschließend **Clear build cache & deploy** ausführen.
