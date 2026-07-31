@@ -1,12 +1,11 @@
-import {FileSearch,Search,Factory,Hash} from 'lucide-react';
-export default function TextSearch({values,setValues,mode,setMode,loading,onSearch}){
- const modes=[['identify','Was ist das?'],['troubleshoot','Fehler finden'],['documents','Unterlagen finden'],['replacement','Ersatzteil suchen']];
- const set=(key,value)=>setValues(v=>({...v,[key]:value}));
- return <section className="card"><div className="section-head"><div><span className="eyebrow">TYP SUCHEN</span><h2>Bezeichnung oder Nummer eingeben</h2></div><FileSearch/></div>
- <p className="intro-copy">Meist reicht eine Typ- oder Bestellnummer. Hersteller und Modell kannst du optional ergänzen.</p>
- <label className="searchbox main-search"><Search/><input value={values.query||''} onChange={e=>set('query',e.target.value)} placeholder="z. B. 6ES7 151-3BA23-0AB0"/></label>
- <details className="optional-fields"><summary>Hersteller oder Modell zusätzlich angeben</summary><div className="field-grid text-fields"><label><span><Factory size={14}/> Hersteller</span><input value={values.manufacturer||''} onChange={e=>set('manufacturer',e.target.value)} placeholder="z. B. Siemens"/></label><label><span><Hash size={14}/> Typ / Modell</span><input value={values.model||''} onChange={e=>set('model',e.target.value)} placeholder="z. B. SITOP 24 V / 20 A"/></label></div></details>
- <div className="choice-title">Was möchtest du wissen?</div><div className="choices">{modes.map(([k,l])=><button type="button" className={mode===k?'active':''} onClick={()=>setMode(k)} key={k}>{l}</button>)}</div>
- <div className="search-strategy simple"><b>So sucht die App</b><p><span>1</span> Hersteller und Originalunterlagen</p><p><span>2</span> Seriöse Fachquellen für fehlende Angaben</p></div>
- <button className="primary wide" disabled={loading||!(values.query||values.model||values.manufacturer)} onClick={onSearch}><Search/>Jetzt suchen</button></section>;
-}
+import {marked} from 'marked';
+import {ExternalLink,Search,ShieldAlert,Factory,Globe2,CheckCircle2,Sparkles,TriangleAlert} from 'lucide-react';
+import UsageSummary from './UsageSummary.jsx';
+function SourceGroup({title,icon:Icon,sources}){if(!sources?.length)return null;return <details className="source-accordion"><summary><Icon size={18}/>{title}<span>{sources.length}</span></summary><div className="sources">{sources.map(s=><a key={s.url} href={s.url} target="_blank" rel="noreferrer"><div><b>{s.title}</b><small>{new URL(s.url).hostname}</small></div><ExternalLink/></a>)}</div></details>}
+export default function ResearchResult({research,recognition,onNew}){return <section className="card result-card"><div className="section-head"><div><span className="eyebrow">ERGEBNIS</span><h2>Das wurde gefunden</h2></div><ShieldAlert/></div>
+ <div className="confirmed"><b>{recognition?.manufacturer||research.normalized?.manufacturer||'Technisches Produkt'} {recognition?.productFamily||research.normalized?.productFamily||''}</b><span>{recognition?.partNumber||recognition?.model||research.normalized?.partNumber||research.normalized?.model||''}</span></div>
+ {research.notice&&<div className="retry-notice"><Sparkles/><span>{research.notice}</span></div>}
+ {research.searchPhases?.length>0&&<div className="phase-list">{research.searchPhases.map(p=><div key={p.id} className={p.status==='completed'?'done':'warning'}>{p.status==='completed'?<CheckCircle2/>:<TriangleAlert/>}<span><b>{p.label}</b><small>{p.sourceCount} passende Quellen{p.retried?' · automatisch gekürzt':''}</small></span></div>)}</div>}
+ <div className="markdown" dangerouslySetInnerHTML={{__html:marked.parse(research.answer)}}/>
+ <SourceGroup title="Offizielle Herstellerquellen" icon={Factory} sources={research.officialSources}/><SourceGroup title="Weitere technische Quellen" icon={Globe2} sources={research.additionalSources}/>
+ <UsageSummary research={research.debug}/><button className="primary wide" onClick={onNew}><Search/>Neue Suche</button><details className="debug"><summary>Technische Diagnose</summary><pre>{JSON.stringify(research.debug,null,2)}</pre></details></section>}

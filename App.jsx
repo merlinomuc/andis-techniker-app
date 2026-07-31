@@ -1,0 +1,1 @@
+{"name":"Andis Techniker-App 3.3","short_name":"Andis Technik","start_url":"/","display":"standalone","background_color":"#06131c","theme_color":"#06131c","icons":[{"src":"/icon.svg","sizes":"any","type":"image/svg+xml"}]}

@@ -1,24 +1,7 @@
-import {Activity, RotateCw, Search} from 'lucide-react';
-
-function n(value){return Number.isFinite(Number(value))?Number(value):0;}
-function collect(usages=[]){
-  return usages.filter(Boolean).reduce((sum,u)=>({
-    input:sum.input+n(u.input_tokens),
-    output:sum.output+n(u.output_tokens),
-    total:sum.total+n(u.total_tokens || n(u.input_tokens)+n(u.output_tokens))
-  }),{input:0,output:0,total:0});
-}
-
-export default function UsageSummary({vision,research}){
-  const usages=research?[research.usage?.official,research.usage?.broad]:[vision?.usage||vision];
-  const totals=collect(usages);
-  const searches=research?[research.officialResponseId?1:0,research.broadResponseId?1:0].reduce((a,b)=>a+b,0):0;
-  const retries=research?[research.officialMeta?.retried,research.broadMeta?.retried].filter(Boolean).length:(vision?.retry?1:0);
-  if(!totals.total&&!searches&&!retries)return null;
-  return <details className="usage-summary"><summary><Activity size={17}/> API-Verbrauch dieser Analyse</summary><div className="usage-grid">
-    <div><span>Eingabe</span><b>{totals.input.toLocaleString('de-DE')} Tokens</b></div>
-    <div><span>Ausgabe</span><b>{totals.output.toLocaleString('de-DE')} Tokens</b></div>
-    {searches>0&&<div><span><Search size={13}/> Websuchen</span><b>{searches}</b></div>}
-    <div><span><RotateCw size={13}/> Wiederholungen</span><b>{retries}</b></div>
-  </div><p>Das ist eine Verbrauchsanzeige, keine exakte Kostenabrechnung. Das gesetzte Tokenlimit allein verursacht keine Kosten.</p></details>;
-}
+import {useRef,useState} from 'react'; import {Camera,Images,ImagePlus,RotateCcw,RotateCw,ScanLine,Scissors,X} from 'lucide-react'; import {BrowserMultiFormatReader} from '@zxing/browser'; import CropModal from './CropModal.jsx';
+export default function ImageUploader({tools,onCode}){const camera=useRef(),gallery=useRef(),video=useRef();const[scanner,setScanner]=useState(false);const[cropIndex,setCropIndex]=useState(null);const[error,setError]=useState('');
+async function add(files){try{await tools.add(files);setError('')}catch(e){setError(e.message)}}
+async function scan(){setScanner(true);setTimeout(async()=>{try{const reader=new BrowserMultiFormatReader();const controls=await reader.decodeFromVideoDevice(undefined,video.current,r=>{if(r){onCode(r.getText());controls.stop();setScanner(false)}})}catch{setError('Kamera konnte nicht geöffnet werden.');setScanner(false)}},80)}
+return <><div className="capture-grid"><button onClick={()=>camera.current.click()}><Camera/><b>Foto aufnehmen</b><span>Kamera öffnen</span></button><button onClick={()=>gallery.current.click()}><Images/><b>Galerie</b><span>Bilder auswählen</span></button><button onClick={scan}><ScanLine/><b>Code scannen</b><span>QR oder Barcode</span></button></div><input ref={camera} hidden type="file" accept="image/*" capture="environment" onChange={e=>{add(e.target.files);e.target.value=''}}/><input ref={gallery} hidden type="file" multiple accept="image/*" onChange={e=>{add(e.target.files);e.target.value=''}}/>{error&&<div className="inline-error">{error}</div>}
+{tools.images.length>0&&<div className="image-panel"><div><strong>{tools.images.length} von 4 Bildern</strong><small>Etikett möglichst groß und gerade zuschneiden.</small></div><div className="previews">{tools.images.map((src,i)=><div className="preview" key={i}><img src={src}/><button className="remove" onClick={()=>tools.remove(i)}><X/></button><div className="editbar"><button title="Links drehen" onClick={()=>tools.rotate(i,-90)}><RotateCcw/></button><button title="Zuschneiden" onClick={()=>setCropIndex(i)}><Scissors/></button><button title="Rechts drehen" onClick={()=>tools.rotate(i,90)}><RotateCw/></button></div></div>)}{tools.images.length<4&&<button className="add-image" onClick={()=>gallery.current.click()}><ImagePlus/><span>Weiteres Bild</span></button>}</div></div>}
+{cropIndex!==null&&<CropModal src={tools.images[cropIndex]} onClose={()=>setCropIndex(null)} onApply={src=>{tools.replace(cropIndex,src);setCropIndex(null)}}/>}{scanner&&<div className="scanner"><button onClick={()=>setScanner(false)}><X/></button><video ref={video}/><p>Code in den Rahmen halten</p></div>}</>}

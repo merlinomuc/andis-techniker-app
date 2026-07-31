@@ -1,11 +1,12 @@
-import {useEffect,useRef,useState} from 'react'; import {Check,X} from 'lucide-react';
-export default function CropModal({src,onClose,onApply}){const canvasRef=useRef(null);const[start,setStart]=useState(null);const[rect,setRect]=useState(null);const[meta,setMeta]=useState(null);
-useEffect(()=>{const img=new Image();img.onload=()=>{const c=canvasRef.current;const maxW=Math.min(window.innerWidth-48,700),maxH=Math.min(window.innerHeight*.58,650),s=Math.min(maxW/img.width,maxH/img.height);c.width=Math.round(img.width*s);c.height=Math.round(img.height*s);c.getContext('2d').drawImage(img,0,0,c.width,c.height);setMeta({img,w:c.width,h:c.height});};img.src=src;},[src]);
-function draw(r=rect){if(!meta)return;const c=canvasRef.current,x=c.getContext('2d');x.clearRect(0,0,c.width,c.height);x.drawImage(meta.img,0,0,c.width,c.height);if(r){x.fillStyle='rgba(0,0,0,.48)';x.fillRect(0,0,c.width,c.height);x.clearRect(r.x,r.y,r.w,r.h);x.strokeStyle='#50ded2';x.lineWidth=3;x.strokeRect(r.x,r.y,r.w,r.h);}}
-useEffect(()=>draw(),[rect,meta]);
-function point(e){const b=canvasRef.current.getBoundingClientRect();const p=e.touches?.[0]||e;return{x:Math.max(0,Math.min(b.width,p.clientX-b.left)),y:Math.max(0,Math.min(b.height,p.clientY-b.top))};}
-function down(e){e.preventDefault();const p=point(e);setStart(p);setRect({x:p.x,y:p.y,w:0,h:0});}
-function move(e){if(!start)return;e.preventDefault();const p=point(e);setRect({x:Math.min(start.x,p.x),y:Math.min(start.y,p.y),w:Math.abs(p.x-start.x),h:Math.abs(p.y-start.y)});}
-function up(){setStart(null)}
-function apply(){if(!rect||rect.w<30||rect.h<30)return;const c=canvasRef.current,out=document.createElement('canvas');out.width=Math.round(rect.w);out.height=Math.round(rect.h);out.getContext('2d').drawImage(c,rect.x,rect.y,rect.w,rect.h,0,0,out.width,out.height);onApply(out.toDataURL('image/jpeg',.96));}
-return <div className="modal"><div className="modal-card"><div className="modal-head"><div><strong>Etikett zuschneiden</strong><span>Ziehe einen Rahmen um den relevanten Bereich.</span></div><button onClick={onClose}><X/></button></div><canvas ref={canvasRef} onMouseDown={down} onMouseMove={move} onMouseUp={up} onMouseLeave={up} onTouchStart={down} onTouchMove={move} onTouchEnd={up}/><div className="modal-actions"><button className="ghost" onClick={onClose}>Abbrechen</button><button className="primary" disabled={!rect||rect.w<30||rect.h<30} onClick={apply}><Check/> Ausschnitt übernehmen</button></div></div></div>}
+import {FileSearch,Search,Factory,Hash} from 'lucide-react';
+export default function TextSearch({values,setValues,mode,setMode,loading,onSearch}){
+ const modes=[['identify','Was ist das?'],['troubleshoot','Fehler finden'],['documents','Unterlagen finden'],['replacement','Ersatzteil suchen']];
+ const set=(key,value)=>setValues(v=>({...v,[key]:value}));
+ return <section className="card"><div className="section-head"><div><span className="eyebrow">TYP SUCHEN</span><h2>Bezeichnung oder Nummer eingeben</h2></div><FileSearch/></div>
+ <p className="intro-copy">Meist reicht eine Typ- oder Bestellnummer. Hersteller und Modell kannst du optional ergänzen.</p>
+ <label className="searchbox main-search"><Search/><input value={values.query||''} onChange={e=>set('query',e.target.value)} placeholder="z. B. 6ES7 151-3BA23-0AB0"/></label>
+ <details className="optional-fields"><summary>Hersteller oder Modell zusätzlich angeben</summary><div className="field-grid text-fields"><label><span><Factory size={14}/> Hersteller</span><input value={values.manufacturer||''} onChange={e=>set('manufacturer',e.target.value)} placeholder="z. B. Siemens"/></label><label><span><Hash size={14}/> Typ / Modell</span><input value={values.model||''} onChange={e=>set('model',e.target.value)} placeholder="z. B. SITOP 24 V / 20 A"/></label></div></details>
+ <div className="choice-title">Was möchtest du wissen?</div><div className="choices">{modes.map(([k,l])=><button type="button" className={mode===k?'active':''} onClick={()=>setMode(k)} key={k}>{l}</button>)}</div>
+ <div className="search-strategy simple"><b>So sucht die App</b><p><span>1</span> Hersteller und Originalunterlagen</p><p><span>2</span> Seriöse Fachquellen für fehlende Angaben</p></div>
+ <button className="primary wide" disabled={loading||!(values.query||values.model||values.manufacturer)} onClick={onSearch}><Search/>Jetzt suchen</button></section>;
+}

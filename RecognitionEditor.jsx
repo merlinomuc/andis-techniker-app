@@ -1,11 +1,24 @@
-import {marked} from 'marked';
-import {ExternalLink,Search,ShieldAlert,Factory,Globe2,CheckCircle2,Sparkles,TriangleAlert} from 'lucide-react';
-import UsageSummary from './UsageSummary.jsx';
-function SourceGroup({title,icon:Icon,sources}){if(!sources?.length)return null;return <details className="source-accordion"><summary><Icon size={18}/>{title}<span>{sources.length}</span></summary><div className="sources">{sources.map(s=><a key={s.url} href={s.url} target="_blank" rel="noreferrer"><div><b>{s.title}</b><small>{new URL(s.url).hostname}</small></div><ExternalLink/></a>)}</div></details>}
-export default function ResearchResult({research,recognition,onNew}){return <section className="card result-card"><div className="section-head"><div><span className="eyebrow">ERGEBNIS</span><h2>Das wurde gefunden</h2></div><ShieldAlert/></div>
- <div className="confirmed"><b>{recognition?.manufacturer||research.normalized?.manufacturer||'Technisches Produkt'} {recognition?.productFamily||research.normalized?.productFamily||''}</b><span>{recognition?.partNumber||recognition?.model||research.normalized?.partNumber||research.normalized?.model||''}</span></div>
- {research.notice&&<div className="retry-notice"><Sparkles/><span>{research.notice}</span></div>}
- {research.searchPhases?.length>0&&<div className="phase-list">{research.searchPhases.map(p=><div key={p.id} className={p.status==='completed'?'done':'warning'}>{p.status==='completed'?<CheckCircle2/>:<TriangleAlert/>}<span><b>{p.label}</b><small>{p.sourceCount} passende Quellen{p.retried?' · automatisch gekürzt':''}</small></span></div>)}</div>}
- <div className="markdown" dangerouslySetInnerHTML={{__html:marked.parse(research.answer)}}/>
- <SourceGroup title="Offizielle Herstellerquellen" icon={Factory} sources={research.officialSources}/><SourceGroup title="Weitere technische Quellen" icon={Globe2} sources={research.additionalSources}/>
- <UsageSummary research={research.debug}/><button className="primary wide" onClick={onNew}><Search/>Neue Suche</button><details className="debug"><summary>Technische Diagnose</summary><pre>{JSON.stringify(research.debug,null,2)}</pre></details></section>}
+import {Activity, RotateCw, Search} from 'lucide-react';
+
+function n(value){return Number.isFinite(Number(value))?Number(value):0;}
+function collect(usages=[]){
+  return usages.filter(Boolean).reduce((sum,u)=>({
+    input:sum.input+n(u.input_tokens),
+    output:sum.output+n(u.output_tokens),
+    total:sum.total+n(u.total_tokens || n(u.input_tokens)+n(u.output_tokens))
+  }),{input:0,output:0,total:0});
+}
+
+export default function UsageSummary({vision,research}){
+  const usages=research?[research.usage?.official,research.usage?.broad]:[vision?.usage||vision];
+  const totals=collect(usages);
+  const searches=research?[research.officialResponseId?1:0,research.broadResponseId?1:0].reduce((a,b)=>a+b,0):0;
+  const retries=research?[research.officialMeta?.retried,research.broadMeta?.retried].filter(Boolean).length:(vision?.retry?1:0);
+  if(!totals.total&&!searches&&!retries)return null;
+  return <details className="usage-summary"><summary><Activity size={17}/> API-Verbrauch dieser Analyse</summary><div className="usage-grid">
+    <div><span>Eingabe</span><b>{totals.input.toLocaleString('de-DE')} Tokens</b></div>
+    <div><span>Ausgabe</span><b>{totals.output.toLocaleString('de-DE')} Tokens</b></div>
+    {searches>0&&<div><span><Search size={13}/> Websuchen</span><b>{searches}</b></div>}
+    <div><span><RotateCw size={13}/> Wiederholungen</span><b>{retries}</b></div>
+  </div><p>Das ist eine Verbrauchsanzeige, keine exakte Kostenabrechnung. Das gesetzte Tokenlimit allein verursacht keine Kosten.</p></details>;
+}
